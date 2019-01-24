@@ -104,7 +104,7 @@ class Canvas:
         self.update()
 
     def displace(self, distance):
-        self.grid += distance
+        self.grid -= distance
         self.update() #needed in the event of non-uniform displacement only, I think
 
     def update(self):
@@ -168,6 +168,23 @@ def display_normals(normals, mask):
     plt.imshow((normals * mask.reshape(1,*mask.shape)).transpose((1, 2, 0)))
     plt.show()
 
+def show_update(can):
+    mask = np.abs(can.grid) < 0.1
+    display_normals(can.normals, mask)
+    plt.imshow(can.grid)
+    CL = plt.contour(can.grid, levels=contours)
+    plt.clabel(CL)
+    plt.show()
+    can.update_sdf(debug_map=debug_map)
+    plt.imshow(can.grid)
+    CL = plt.contour(can.grid, levels=contours)
+    plt.clabel(CL)
+    plt.show()
+    plt.contour(can.grid, levels=contours)
+    plt.imshow(np.sqrt(can.normals[0]*can.normals[0] + can.normals[1]*can.normals[1]))
+    plt.colorbar()
+    plt.show()
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     can = Canvas([10,10], [100,100])
@@ -175,45 +192,12 @@ if __name__ == '__main__':
     contours = np.linspace(-2, 2, 11)
 
     can.draw_square([5,5],radius=1.5, angle=np.pi/8)
-    mask = np.abs(can.grid) < 0.1
-    display_normals(can.normals, mask)
-    plt.imshow(can.grid)
-    CL = plt.contour(can.grid, levels=contours)
-    plt.clabel(CL)
-    plt.show()
-    can.update_sdf(debug_map=debug_map)
-    plt.imshow(can.grid)
-    CL = plt.contour(can.grid, levels=contours)
-    plt.clabel(CL)
-    plt.show()
-    plt.contour(can.grid, levels=contours)
-    plt.imshow(np.sqrt(can.normals[0]*can.normals[0] + can.normals[1]*can.normals[1]))
-    plt.colorbar()
-    plt.show()
+    show_update(can)
+    can.displace(1)
+    show_update(can)
 
     can.clear()
 
     can.draw_circle([4,5], radius=3.5)
     can.draw_circle([7.4,7.4], radius=2, subtract=False)
-
-    mask = np.abs(can.grid) < 0.1
-    display_normals(can.normals, mask)
-
-    plt.imshow(can.grid)
-    plt.contour(can.grid, levels=contours)
-    plt.show()
-    can.update_sdf(debug_map=debug_map)
-    plt.imshow(can.grid)
-    plt.contour(can.grid, levels=contours)
-    plt.show()
-    plt.contour(can.grid, levels=contours)
-    plt.imshow(np.sqrt(can.normals[0]*can.normals[0] + can.normals[1]*can.normals[1]))
-    plt.colorbar()
-    plt.show()
-
-    #plt.imshow(debug_map)
-    #plt.show()
-
-    can.displace(1)
-    mask = np.abs(can.grid) < 0.1
-    display_normals(can.normals, mask)
+    show_update(can)
