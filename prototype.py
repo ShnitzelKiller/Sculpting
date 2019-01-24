@@ -1,6 +1,6 @@
 import numpy as np
 
-def compute_distance(grid, states, y, x, h):
+def compute_distance(grid, states, y, x, h, debug_map=None):
     quadrants = []
     for py in [y-1,y+1]:
         if py < 0 or py >= grid.shape[0]:
@@ -37,6 +37,9 @@ def compute_distance(grid, states, y, x, h):
                 dist = h + Ui
                 sides.append(dist)
         if len(sides) == 0:
+            print('failed to find distance')
+            if debug_map is not None:
+                debug_map[y,x] = 1
             return np.inf
         else:
             return min(sides)
@@ -94,17 +97,19 @@ class Canvas:
     def update_normals(self):
         self.normals = np.stack([partialy(self.grid), partialx(self.grid)]) * (self.resolution/self.dims).reshape(2, 1, 1)
 
-    def fast_marching(self):
-        #fast marching by sethian
+    def fast_marching(self, clear=True, debug_map=None):
+        #fast marching algorithm by sethian
         #states:
         #0 = far
         #1 = considered
         #2 = accepted
+
         #initialization
         L = set()
         states = np.zeros_like(self.grid, np.int)
         states[self.grid <= 0] = 2
-        self.grid[states != 2] = np.inf
+        if clear:
+            self.grid[states != 2] = np.inf
         mask = states == 2
         mask2 = (mask + sum([sum([np.roll(mask, dir, dim) for dir in [-1,1]]) for dim in [0,1]])) != 0
         mask = mask2 ^ mask #initial set of nodes added to L
@@ -112,7 +117,7 @@ class Canvas:
         inds = self.indices[:,mask]
         for i in range(inds.shape[1]):
             y, x = inds[:,i]
-            u = compute_distance(self.grid, states, y, x, self.spacing[0]) #TODO: enforce consistent x and y spacing
+            u = compute_distance(self.grid, states, y, x, self.spacing[0], debug_map) #TODO: enforce consistent x and y spacing
             if u < self.grid[y,x]:
                 self.grid[y,x] = u
             L.add((y, x))
@@ -128,37 +133,42 @@ class Canvas:
                     coords[dim] = min(max(0, coords[dim]+direction), states.shape[dim]-1)
                     py, px = coords
                     if states[py, px] != 2:
-                        u = compute_distance(self.grid, states, py, px, self.spacing[0])
+                        u = compute_distance(self.grid, states, py, px, self.spacing[0], debug_map)
                         if u < self.grid[py,px]:
                             self.grid[py,px] = u
                         if states[py, px] == 0:
                             states[py, px] = 1
                             L.add((py,px))
 
-    def update_sdf(self):
-        self.fast_marching()
+    def update_sdf(self, clear=True, debug_map=None):
+        self.fast_marching(clear=clear, debug_map=debug_map)
         self.grid = -self.grid
-        self.fast_marching()
+        self.fast_marching(clear=clear, debug_map=debug_map)
         self.grid = -self.grid
 
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     can = Canvas([10,10], [100,100])
-    can.draw_circle([4,5], radius=4)
-    can.draw_circle([7.5,5], radius=2, subtract=False)
+    can.draw_circle([4,5], radius=3.5)
+    can.draw_circle([7.4,7.4], radius=2, subtract=False)
 
     mask = np.abs(can.grid) < 0.1
     plt.imshow(can.normals[0] * mask)
     plt.show()
 
     plt.imshow(can.grid)
-    plt.contour(can.grid)
+    contours = np.linspace(-2, 2, 11)
+    plt.contour(can.grid, levels=contours)
     plt.show()
-    can.update_sdf()
+    debug_map = np.zeros_like(can.grid, dtype=np.int)
+    can.update_sdf(debug_map=debug_map)
     plt.imshow(can.grid)
-    plt.contour(can.grid)
+    plt.contour(can.grid, levels=contours)
     plt.show()
+
+    #plt.imshow(debug_map)
+    #plt.show()
 
     can.displace(1)
     mask = np.abs(can.grid) < 0.1
