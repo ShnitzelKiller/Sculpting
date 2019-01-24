@@ -90,8 +90,12 @@ class Canvas:
 
         self.update()
 
-    def draw_rect(self, lower, upper, subtract=False):
-        rect = np.maximum(*[np.maximum(lower[dim] - self.coords[dim], self.coords[dim] - upper[dim]) for dim in [0, 1]])
+    def draw_square(self, center, radius, angle=0, subtract=False):
+        rotmat = np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle),np.cos(angle)]])
+        rotcoords = np.dot(rotmat, self.coords.transpose((1, 0, 2)))
+        center = rotmat.dot(np.array(center))
+        rotcoords -= center.reshape(2, 1, 1)
+        rect = np.maximum(*[np.maximum(-radius - rotcoords[dim], rotcoords[dim] - radius) for dim in [0, 1]])
         if subtract:
             self.grid = np.maximum(self.grid, -rect)
         else:
@@ -108,7 +112,7 @@ class Canvas:
         self.update_normals()
 
     def update_normals(self):
-        self.normals = np.stack([partialy(self.grid), partialx(self.grid)]) * (self.resolution/self.dims).reshape(2, 1, 1)
+        self.normals = np.stack([partialy(self.grid), partialx(self.grid)]) / self.spacing.reshape(2, 1, 1)
 
     def fast_marching(self, clear=True, debug_map=None):
         #fast marching algorithm by sethian
@@ -170,15 +174,21 @@ if __name__ == '__main__':
     debug_map = np.zeros_like(can.grid, dtype=np.int)
     contours = np.linspace(-2, 2, 11)
 
-    can.draw_rect([4,4],[6,6])
+    can.draw_square([5,5],radius=1.5, angle=np.pi/8)
     mask = np.abs(can.grid) < 0.1
     display_normals(can.normals, mask)
     plt.imshow(can.grid)
-    plt.contour(can.grid, levels=contours)
+    CL = plt.contour(can.grid, levels=contours)
+    plt.clabel(CL)
     plt.show()
     can.update_sdf(debug_map=debug_map)
     plt.imshow(can.grid)
+    CL = plt.contour(can.grid, levels=contours)
+    plt.clabel(CL)
+    plt.show()
     plt.contour(can.grid, levels=contours)
+    plt.imshow(np.sqrt(can.normals[0]*can.normals[0] + can.normals[1]*can.normals[1]))
+    plt.colorbar()
     plt.show()
 
     can.clear()
@@ -195,6 +205,10 @@ if __name__ == '__main__':
     can.update_sdf(debug_map=debug_map)
     plt.imshow(can.grid)
     plt.contour(can.grid, levels=contours)
+    plt.show()
+    plt.contour(can.grid, levels=contours)
+    plt.imshow(np.sqrt(can.normals[0]*can.normals[0] + can.normals[1]*can.normals[1]))
+    plt.colorbar()
     plt.show()
 
     #plt.imshow(debug_map)
