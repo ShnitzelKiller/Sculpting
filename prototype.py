@@ -44,6 +44,7 @@ def compute_distance(grid, states, y, x, h):
     else:
         return min(quadrants)
 
+
 def partialy(x):
     x2 = np.roll(x,-1, 0)
     x1 = np.roll(x, 1, 0)
@@ -93,12 +94,13 @@ class Canvas:
     def update_normals(self):
         self.normals = np.stack([partialy(self.grid), partialx(self.grid)]) * (self.resolution/self.dims).reshape(2, 1, 1)
 
-    def update_sdf(self):
+    def fast_marching(self):
         #fast marching by sethian
         #states:
         #0 = far
         #1 = considered
         #2 = accepted
+        #initialization
         L = set()
         states = np.zeros_like(self.grid, np.int)
         states[self.grid <= 0] = 2
@@ -115,6 +117,7 @@ class Canvas:
                 self.grid[y,x] = u
             L.add((y, x))
 
+        #main loop
         while len(L) > 0:
             y, x = min(L, key=lambda yx:self.grid[yx[0],yx[1]])
             states[y,x] = 2
@@ -132,24 +135,29 @@ class Canvas:
                             states[py, px] = 1
                             L.add((py,px))
 
+    def update_sdf(self):
+        self.fast_marching()
+        self.grid = -self.grid
+        self.fast_marching()
+        self.grid = -self.grid
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     can = Canvas([10,10], [100,100])
     can.draw_circle([4,5], radius=4)
-    can.draw_circle([8,5], radius=2, subtract=False)
+    can.draw_circle([7.5,5], radius=2, subtract=False)
 
     mask = np.abs(can.grid) < 0.1
     plt.imshow(can.normals[0] * mask)
     plt.show()
 
     plt.imshow(can.grid)
+    plt.contour(can.grid)
     plt.show()
     can.update_sdf()
-    can.grid = -can.grid
-    can.update_sdf()
-    can.grid = -can.grid
     plt.imshow(can.grid)
+    plt.contour(can.grid)
     plt.show()
 
     can.displace(1)
