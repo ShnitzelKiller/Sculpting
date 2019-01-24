@@ -75,6 +75,10 @@ class Canvas:
         self.coords = self.indices * self.spacing.reshape(2, 1, 1)
         self.normals = np.full((2, resolution[0], resolution[1]), np.nan)
 
+    def clear(self):
+        self.grid.fill(np.inf)
+        self.normals.fill(0)
+
     def draw_circle(self, pos, radius=1, subtract=False):
         pos = np.array(pos)
         circle = np.sqrt(np.sum((self.coords - pos.reshape(2, 1, 1))**2, 0)) - radius
@@ -83,6 +87,15 @@ class Canvas:
             self.grid = np.maximum(self.grid, -circle)
         else:
             self.grid = np.minimum(self.grid, circle)
+
+        self.update()
+
+    def draw_rect(self, lower, upper, subtract=False):
+        rect = np.maximum(*[np.maximum(lower[dim] - self.coords[dim], self.coords[dim] - upper[dim]) for dim in [0, 1]])
+        if subtract:
+            self.grid = np.maximum(self.grid, -rect)
+        else:
+            self.grid = np.minimum(self.grid, rect)
 
         self.update()
 
@@ -146,22 +159,39 @@ class Canvas:
         self.fast_marching(clear=clear, debug_map=debug_map)
         self.grid = -self.grid
 
+def display_normals(normals, mask):
+    normals = np.insert(normals / 3 + 0.5, 0, 0.5, axis=0)
+    plt.imshow((normals * mask.reshape(1,*mask.shape)).transpose((1, 2, 0)))
+    plt.show()
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     can = Canvas([10,10], [100,100])
+    debug_map = np.zeros_like(can.grid, dtype=np.int)
+    contours = np.linspace(-2, 2, 11)
+
+    can.draw_rect([4,4],[6,6])
+    mask = np.abs(can.grid) < 0.1
+    display_normals(can.normals, mask)
+    plt.imshow(can.grid)
+    plt.contour(can.grid, levels=contours)
+    plt.show()
+    can.update_sdf(debug_map=debug_map)
+    plt.imshow(can.grid)
+    plt.contour(can.grid, levels=contours)
+    plt.show()
+
+    can.clear()
+
     can.draw_circle([4,5], radius=3.5)
     can.draw_circle([7.4,7.4], radius=2, subtract=False)
 
     mask = np.abs(can.grid) < 0.1
-    plt.imshow(can.normals[0] * mask)
-    plt.show()
+    display_normals(can.normals, mask)
 
     plt.imshow(can.grid)
-    contours = np.linspace(-2, 2, 11)
     plt.contour(can.grid, levels=contours)
     plt.show()
-    debug_map = np.zeros_like(can.grid, dtype=np.int)
     can.update_sdf(debug_map=debug_map)
     plt.imshow(can.grid)
     plt.contour(can.grid, levels=contours)
@@ -172,9 +202,4 @@ if __name__ == '__main__':
 
     can.displace(1)
     mask = np.abs(can.grid) < 0.1
-    plt.imshow(can.normals[0] * mask)
-    plt.show()
-    can.displace(-1)
-    mask = np.abs(can.grid) < 0.1
-    plt.imshow(can.normals[0] * mask)
-    plt.show()
+    display_normals(can.normals, mask)
