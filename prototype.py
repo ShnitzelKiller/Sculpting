@@ -52,18 +52,18 @@ def partialx(x):
     return result
 
 class Canvas:
-    def __init__(self, dims=[10, 10], resolution=[100,100]):
+    def __init__(self, dims=[10, 10], spacing=1):
         self.dims = np.array(dims, dtype=np.float)
-        self.resolution = np.array(resolution, dtype=np.float)
-        self.grid = np.full(resolution, np.inf)
-        self.indices = np.indices(resolution)
-        self.spacing = self.dims/self.resolution
-        self.coords = self.indices * self.spacing.reshape(2, 1, 1)
-        self.normals = np.full((2, resolution[0], resolution[1]), np.nan)
+        self.resolution = np.ceil(self.dims / spacing).astype(np.int)
+        self.grid = np.full(self.resolution, np.inf)
+        self.indices = np.indices(self.resolution)
+        self.coords = self.indices.astype(np.float) * spacing
+        self.normals = np.full((2, self.resolution[0], self.resolution[1]), np.nan)
+        self.spacing = spacing
 
     def clear(self):
         self.grid.fill(np.inf)
-        self.normals.fill(0)
+        self.normals.fill(np.nan)
 
     def draw_circle(self, pos, radius=1, subtract=False):
         pos = np.array(pos)
@@ -98,7 +98,7 @@ class Canvas:
         self.update_normals()
 
     def update_normals(self):
-        self.normals = np.stack([partialy(self.grid), partialx(self.grid)]) / self.spacing.reshape(2, 1, 1)
+        self.normals = np.stack([partialy(self.grid), partialx(self.grid)]) / self.spacing
 
     def fast_marching(self, clear=True, debug_map=None):
         #fast marching algorithm by sethian
@@ -120,7 +120,7 @@ class Canvas:
         inds = self.indices[:,mask]
         for i in range(inds.shape[1]):
             y, x = inds[:,i]
-            u = compute_distance(self.grid, states, y, x, self.spacing[0], debug_map) #TODO: enforce consistent x and y spacing
+            u = compute_distance(self.grid, states, y, x, self.spacing, debug_map) #TODO: enforce consistent x and y spacing
             if u < self.grid[y,x]:
                 self.grid[y,x] = u
             L.add((y, x))
@@ -136,7 +136,7 @@ class Canvas:
                     coords[dim] = min(max(0, coords[dim]+direction), states.shape[dim]-1)
                     py, px = coords
                     if states[py, px] != 2:
-                        u = compute_distance(self.grid, states, py, px, self.spacing[0], debug_map)
+                        u = compute_distance(self.grid, states, py, px, self.spacing, debug_map)
                         if u < self.grid[py,px]:
                             self.grid[py,px] = u
                         if states[py, px] == 0:
@@ -175,7 +175,7 @@ def show_update(can):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    can = Canvas([10,10], [100,100])
+    can = Canvas([10,10], 0.1)
     debug_map = np.zeros_like(can.grid, dtype=np.int)
     contours = np.linspace(-2, 2, 11)
 
