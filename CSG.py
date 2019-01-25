@@ -1,3 +1,4 @@
+import numpy as np
 class CSG(object):
     def __init__(self):
         self.rotation = np.eye(2)
