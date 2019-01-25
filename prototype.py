@@ -68,6 +68,27 @@ class CSG(object):
     def set_translation(self, offset):
         self.translation = np.array(offset)
 
+class Union(CSG):
+    def __init__(self, *shapes):
+        super(Union, self).__init__()
+        self.shapes = shapes
+    def _map(self, pos):
+        return min([shape(pos) for shape in self.shapes])
+
+class Intersection(CSG):
+    def __init__(self, *shapes):
+        super(Intersection, self).__init__()
+        self.shapes = shapes
+    def _map(self, pos):
+        return max([shape(pos) for shape in self.shapes])
+
+class Negation(CSG):
+    def __init__(self, shape):
+        super(Negation, self).__init__()
+        self.shape = shape
+    def _map(self, pos):
+        return -self.shape(pos)
+
 class Circle(CSG):
     def __init__(self, radius):
         super(Circle, self).__init__()
@@ -205,8 +226,9 @@ if __name__ == '__main__':
     square2.set_rotation(np.pi/4)
     square2.set_translation([6,6])
 
-    can.draw_solid(square)
-    can.draw_solid(square2, subtract=True)
+    squares = Intersection(square, Negation(square2))
+
+    can.draw_solid(squares)
     show_update(can)
     can.displace(1.6)
     display_normals(can.normals, np.abs(can.grid) < 0.1)
@@ -216,8 +238,8 @@ if __name__ == '__main__':
     circle.set_translation([4,5])
     circle2 = Circle(2)
     circle2.set_translation([7.4,7.4])
-    can.draw_solid(circle)
-    can.draw_solid(circle2)
+    circles = Union(circle, circle2)
+    can.draw_solid(circles)
     show_update(can)
     can.displace(-1.6)
     display_normals(can.normals, np.abs(can.grid) < 0.1)
