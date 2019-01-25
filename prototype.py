@@ -1,51 +1,39 @@
 import numpy as np
 
 def compute_distance(grid, states, y, x, h, debug_map=None):
-    quadrants = []
-    for py in [y-1,y+1]:
-        if py < 0 or py >= grid.shape[0]:
-            continue
-        for px in [x-1,x+1]:
-            if px < 0 or px >= grid.shape[1]:
+    mindists = [np.inf, np.inf]
+    for dim in [0,1]:
+        for dist in [-1,1]:
+            coords = [y,x]
+            coords[dim] += dist
+            py, px = coords
+            if coords[dim] < 0 or coords[dim] >= grid.shape[dim]:
                 continue
-            if states[py, x] == 0 or states[y, px] == 0:
+            if states[py, px] == 0:
                 continue
-            Uy = grid[py,x]
-            Ux = grid[y, px]
-            if not np.isfinite(Uy) or not np.isfinite(Ux):
-                continue
-            disc = (Uy+Ux)**2-2*(Uy*Uy+Ux*Ux-h*h)
-            if disc < 0:
-                continue
-            dist = 0.5*(Uy+Ux)+0.5*np.sqrt(disc)
-            quadrants.append(dist)
-    #fall back on one-sided update if quadratic has no roots
-    if len(quadrants) == 0:
-        sides = []
-        for dim in [0, 1]:
-            for dist in [-1, 1]:
-                coords = [y, x]
-                coords[dim] += dist
-                if coords[dim] < 0 or coords[dim] >= grid.shape[dim]:
-                    continue
-                py, px = coords
-                if states[py, px] == 0:
-                    continue
-                Ui = grid[py, px]
-                if not np.isfinite(Ui):
-                    continue
-                dist = h + Ui
-                sides.append(dist)
-        if len(sides) == 0:
-            print('failed to find distance')
-            if debug_map is not None:
-                debug_map[y,x] = 1
-            return np.inf
-        else:
-            return min(sides)
+            mindists[dim] = min(mindists[dim], grid[py, px])
 
-    else:
-        return min(quadrants)
+    Uy, Ux = mindists
+    if np.isfinite(Uy) and np.isfinite(Ux):
+        disc = 2*h*h - (Ux - Uy)**2
+        if disc >= 0:
+            dist = 0.5*(Uy+Ux)+0.5*np.sqrt(disc)
+            return dist
+    #fall back on one-sided update if quadratic has no roots
+    dist = np.inf
+    for Ui in mindists:
+        if np.isfinite(Ui):
+            dist = min(dist, h + Ui)
+
+    if np.isfinite(dist):
+        return dist
+        
+    print('failed to find distance')
+    if debug_map is not None:
+        debug_map[y,x] = 1
+    return np.inf
+
+
 
 
 def partialy(x):
@@ -193,7 +181,9 @@ if __name__ == '__main__':
 
     can.draw_square([5,5],radius=1.5, angle=np.pi/8)
     show_update(can)
-    can.displace(1)
+
+    can.clear()
+    can.draw_circle([5, 5], radius=1)
     show_update(can)
 
     can.clear()
