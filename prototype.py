@@ -51,6 +51,40 @@ def partialx(x):
     result[:,1:-1] = (x2[:,1:-1] - x1[:,1:-1])*0.5
     return result
 
+class CSG(object):
+    def __init__(self):
+        self.rotation = np.eye(2)
+        self.translation = np.zeros(2)
+    def __call__(self, pos):
+        if not hasattr(self, '_map'):
+            raise ValueError('CSG solid does not implement map function')
+        return self._map(self._transform(pos))
+    def _transform(self, pos):
+        return self.rotation.dot(pos - self.translation)
+    def set_rotation(self, angle):
+        c = np.cos(-angle)
+        s = np.sin(-angle)
+        self.rotation = np.array([[c, -s], [s, c]])
+    def set_translation(self, offset):
+        self.translation = np.array(offset)
+
+class Circle(CSG):
+    def __init__(self, radius):
+        super(Circle, self).__init__()
+        self.radius = radius
+    def _map(self, pos):
+        return np.sqrt(pos[0]*pos[0]+pos[1]*pos[1]) - self.radius
+
+class Square(CSG):
+    def __init__(self, radius):
+        super(Square, self).__init__()
+        self.radius = radius
+    def _map(self, pos):
+        inside = np.max(np.abs(pos)) - self.radius
+        disp = np.clip(np.abs(pos)-self.radius, 0, None)
+        return min(inside, 0) + np.sqrt(disp.dot(disp))
+
+
 class Canvas:
     def __init__(self, dims=[10, 10], spacing=1):
         self.dims = np.array(dims, dtype=np.float)
@@ -65,36 +99,19 @@ class Canvas:
         self.grid.fill(np.inf)
         self.normals.fill(np.nan)
 
-    def draw_circle(self, pos, radius=1, subtract=False):
-        pos = np.array(pos)
-        circle = np.sqrt(np.sum((self.coords - pos.reshape(2, 1, 1))**2, 0)) - radius
-
+    def draw_solid(self, shape, subtract=False):
+        vals = np.apply_along_axis(shape, 0, self.coords)
         if subtract:
-            self.grid = np.maximum(self.grid, -circle)
+            self.grid = np.maximum(self.grid, -vals)
         else:
-            self.grid = np.minimum(self.grid, circle)
-
-        self.update()
-
-    def draw_square(self, center, radius, angle=0, subtract=False):
-        rotmat = np.array([[np.cos(angle), -np.sin(angle)],[np.sin(angle),np.cos(angle)]])
-        rotcoords = np.dot(rotmat, self.coords.transpose((1, 0, 2)))
-        center = rotmat.dot(np.array(center))
-        rotcoords -= center.reshape(2, 1, 1)
-        rect = np.maximum(*[np.maximum(-radius - rotcoords[dim], rotcoords[dim] - radius) for dim in [0, 1]])
-        if subtract:
-            self.grid = np.maximum(self.grid, -rect)
-        else:
-            self.grid = np.minimum(self.grid, rect)
-
-        self.update()
+            self.grid = np.minimum(self.grid, vals)
 
     def displace(self, distance):
         self.grid -= distance
-        self.update() #needed in the event of non-uniform displacement only, I think
+        #self.update() #needed in the event of non-uniform displacement only, I think
 
     def update(self):
-        #self.update_sdf()
+        self.update_sdf()
         self.update_normals()
 
     def update_normals(self):
@@ -158,12 +175,14 @@ def show_update(can):
     X = can.coords[1,0,:]
     Y = can.coords[0,:,0]
     mask = np.abs(can.grid) < 0.1
+    can.update_normals()
     display_normals(can.normals, mask)
     plt.imshow(can.grid, extent=(X[0],X[-1],Y[0],Y[-1]), origin='lower')
     CL = plt.contour(X, Y, can.grid, levels=contours)
     plt.clabel(CL)
     plt.show()
     can.update_sdf(debug_map=debug_map)
+    can.update_normals()
     plt.imshow(can.grid, extent=(X[0],X[-1],Y[0],Y[-1]), origin='lower')
     CL = plt.contour(X, Y, can.grid, levels=contours)
     plt.clabel(CL)
@@ -179,16 +198,26 @@ if __name__ == '__main__':
     debug_map = np.zeros_like(can.grid, dtype=np.int)
     contours = np.linspace(-2, 2, 11)
 
-    can.draw_square([5,5],radius=1.5, angle=0)
-    show_update(can)
-    can.draw_square([6, 6], radius=1.3, angle=np.pi/4, subtract=True)
+    square = Square(1.5)
+    square.set_translation([5, 5])
+
+    square2 = Square(1.3)
+    square2.set_rotation(np.pi/4)
+    square2.set_translation([6,6])
+
+    can.draw_solid(square)
+    can.draw_solid(square2, subtract=True)
     show_update(can)
     can.displace(1.6)
     display_normals(can.normals, np.abs(can.grid) < 0.1)
     can.clear()
 
-    can.draw_circle([4,5], radius=3.5)
-    can.draw_circle([7.4,7.4], radius=2, subtract=False)
+    circle = Circle(3.5)
+    circle.set_translation([4,5])
+    circle2 = Circle(2)
+    circle2.set_translation([7.4,7.4])
+    can.draw_solid(circle)
+    can.draw_solid(circle2)
     show_update(can)
     can.displace(-1.6)
     display_normals(can.normals, np.abs(can.grid) < 0.1)
