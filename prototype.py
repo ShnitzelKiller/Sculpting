@@ -1,6 +1,7 @@
 import numpy as np
 
 def compute_distance(grid, states, y, x, h, debug_map=None):
+    #find the upwind values along each dimension
     mindists = [np.inf, np.inf]
     for dim in [0,1]:
         for dist in [-1,1]:
@@ -12,7 +13,6 @@ def compute_distance(grid, states, y, x, h, debug_map=None):
             if states[py, px] == 0:
                 continue
             mindists[dim] = min(mindists[dim], grid[py, px])
-
     Uy, Ux = mindists
     if np.isfinite(Uy) and np.isfinite(Ux):
         disc = 2*h*h - (Ux - Uy)**2
@@ -27,13 +27,11 @@ def compute_distance(grid, states, y, x, h, debug_map=None):
 
     if np.isfinite(dist):
         return dist
-        
+
     print('failed to find distance')
     if debug_map is not None:
         debug_map[y,x] = 1
     return np.inf
-
-
 
 
 def partialy(x):
@@ -153,24 +151,26 @@ class Canvas:
 
 def display_normals(normals, mask):
     normals = np.insert(normals / 3 + 0.5, 0, 0.5, axis=0)
-    plt.imshow((normals * mask.reshape(1,*mask.shape)).transpose((1, 2, 0)))
+    plt.imshow((normals * mask.reshape(1,*mask.shape)).transpose((1, 2, 0)), origin='lower')
     plt.show()
 
 def show_update(can):
+    X = can.coords[1,0,:]
+    Y = can.coords[0,:,0]
     mask = np.abs(can.grid) < 0.1
     display_normals(can.normals, mask)
-    plt.imshow(can.grid)
-    CL = plt.contour(can.grid, levels=contours)
+    plt.imshow(can.grid, extent=(X[0],X[-1],Y[0],Y[-1]), origin='lower')
+    CL = plt.contour(X, Y, can.grid, levels=contours)
     plt.clabel(CL)
     plt.show()
     can.update_sdf(debug_map=debug_map)
-    plt.imshow(can.grid)
-    CL = plt.contour(can.grid, levels=contours)
+    plt.imshow(can.grid, extent=(X[0],X[-1],Y[0],Y[-1]), origin='lower')
+    CL = plt.contour(X, Y, can.grid, levels=contours)
     plt.clabel(CL)
     plt.show()
-    plt.contour(can.grid, levels=contours)
-    plt.imshow(np.sqrt(can.normals[0]*can.normals[0] + can.normals[1]*can.normals[1]))
-    plt.colorbar()
+    #plt.contour(can.grid, levels=contours)
+    #plt.imshow(np.sqrt(can.normals[0]*can.normals[0] + can.normals[1]*can.normals[1]))
+    #plt.colorbar()
     plt.show()
 
 if __name__ == '__main__':
@@ -179,15 +179,16 @@ if __name__ == '__main__':
     debug_map = np.zeros_like(can.grid, dtype=np.int)
     contours = np.linspace(-2, 2, 11)
 
-    can.draw_square([5,5],radius=1.5, angle=np.pi/8)
+    can.draw_square([5,5],radius=1.5, angle=0)
     show_update(can)
-
-    can.clear()
-    can.draw_circle([5, 5], radius=1)
+    can.draw_square([6, 6], radius=1.3, angle=np.pi/4, subtract=True)
     show_update(can)
-
+    can.displace(1.6)
+    display_normals(can.normals, np.abs(can.grid) < 0.1)
     can.clear()
 
     can.draw_circle([4,5], radius=3.5)
     can.draw_circle([7.4,7.4], radius=2, subtract=False)
     show_update(can)
+    can.displace(-1.6)
+    display_normals(can.normals, np.abs(can.grid) < 0.1)
