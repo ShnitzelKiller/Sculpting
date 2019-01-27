@@ -1,9 +1,9 @@
 import numpy as np
 from CSG import *
 
-def compute_distance(grid, states, y, x, h, debug_map=None):
+def compute_distance(grid, states, y, x, h, maxdist = np.inf, debug_map=None):
     #find the upwind values along each dimension
-    mindists = [np.inf, np.inf]
+    mindists = [maxdist, maxdist]
     for dim in [0,1]:
         for dist in [-1,1]:
             coords = [y,x]
@@ -15,24 +15,18 @@ def compute_distance(grid, states, y, x, h, debug_map=None):
                 continue
             mindists[dim] = min(mindists[dim], grid[py, px])
     Uy, Ux = mindists
-    if np.isfinite(Uy) and np.isfinite(Ux):
+    if Uy < maxdist and Ux < maxdist:
         disc = 2*h*h - (Ux - Uy)**2
         if disc >= 0:
             dist = 0.5*(Uy+Ux)+0.5*np.sqrt(disc)
             return dist
+
     #fall back on one-sided update if quadratic has no roots
-    dist = np.inf
-    for Ui in mindists:
-        if np.isfinite(Ui):
-            dist = min(dist, h + Ui)
+    Umin = min(Ux, Uy)
+    if Umin >= maxdist:
+        return maxdist
 
-    if np.isfinite(dist):
-        return dist
-
-    print('failed to find distance')
-    if debug_map is not None:
-        debug_map[y,x] = 1
-    return np.inf
+    return h+Umin
 
 
 def partialy(x):
@@ -54,17 +48,18 @@ def partialx(x):
 
 
 class Canvas:
-    def __init__(self, dims=[10, 10], spacing=1):
+    def __init__(self, dims=[10, 10], spacing=1, maxdist = 1):
         self.dims = np.array(dims, dtype=np.float)
         self.resolution = np.ceil(self.dims / spacing).astype(np.int)
-        self.grid = np.full(self.resolution, np.inf)
+        self.grid = np.full(self.resolution, maxdist)
         self.indices = np.indices(self.resolution)
         self.coords = self.indices.astype(np.float) * spacing
         self.normals = np.full((2, self.resolution[0], self.resolution[1]), np.nan)
         self.spacing = spacing
+        self.maxdist = maxdist
 
     def clear(self):
-        self.grid.fill(np.inf)
+        self.grid.fill(self.maxdist)
         self.normals.fill(np.nan)
 
     def draw_solid(self, shape, subtract=False):
@@ -97,15 +92,15 @@ class Canvas:
         states = np.zeros_like(self.grid, np.int)
         states[self.grid <= 0] = 2
         if clear:
-            self.grid[states != 2] = np.inf
+            self.grid[states != 2] = self.maxdist
         mask = states == 2
         mask2 = (mask + sum([sum([np.roll(mask, dir, dim) for dir in [-1,1]]) for dim in [0,1]])) != 0
-        mask = mask2 ^ mask #initial set of nodes added to L
+        mask = mask2 ^ mask #initial set of nodes added to L: neighbor set of accepted nodes
         states[mask] = 1
         inds = self.indices[:,mask]
         for i in range(inds.shape[1]):
             y, x = inds[:,i]
-            u = compute_distance(self.grid, states, y, x, self.spacing, debug_map) #TODO: enforce consistent x and y spacing
+            u = compute_distance(self.grid, states, y, x, self.spacing, maxdist = self.maxdist, debug_map=debug_map)
             if u < self.grid[y,x]:
                 self.grid[y,x] = u
             L.add((y, x))
@@ -121,10 +116,10 @@ class Canvas:
                     coords[dim] = min(max(0, coords[dim]+direction), states.shape[dim]-1)
                     py, px = coords
                     if states[py, px] != 2:
-                        u = compute_distance(self.grid, states, py, px, self.spacing, debug_map)
+                        u = compute_distance(self.grid, states, py, px, self.spacing, maxdist = self.maxdist, debug_map=debug_map)
                         if u < self.grid[py,px]:
                             self.grid[py,px] = u
-                        if states[py, px] == 0:
+                        if u < self.maxdist and states[py, px] == 0:
                             states[py, px] = 1
                             L.add((py,px))
 
@@ -149,7 +144,9 @@ def show_update(can):
     CL = plt.contour(X, Y, can.grid, levels=contours)
     plt.clabel(CL)
     plt.show()
+    t1 = time()
     can.update_sdf(debug_map=debug_map)
+    print('updated in: {}'.format(time() - t1))
     can.update_normals()
     plt.imshow(can.grid, extent=(X[0],X[-1],Y[0],Y[-1]), origin='lower')
     CL = plt.contour(X, Y, can.grid, levels=contours)
@@ -162,7 +159,8 @@ def show_update(can):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    can = Canvas([10,10], 0.1)
+    from time import time
+    can = Canvas([10,10], 0.1, maxdist=2)
     debug_map = np.zeros_like(can.grid, dtype=np.int)
     contours = np.linspace(-2, 2, 11)
 
