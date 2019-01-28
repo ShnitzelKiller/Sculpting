@@ -1,6 +1,6 @@
 include("canvas.jl")
 using Plots
-function display_normals(image, normals, dists)
+function display_normals!(image::Matrix{RGB{T}}, normals::Array{T,3}, dists::Matrix{T}) where {T <: AbstractFloat}
     for I in CartesianIndices(image)
         rg = @view normals[:,I]
         dist = dists[I]
@@ -10,9 +10,9 @@ function display_normals(image, normals, dists)
     end
     return image
 end
-function display_normals(normals, dists)
-    image = Array{RGB{eltype(normals)}}(undef, size(normals)[2:end]...)::Array{RGB{eltype(normals)}, 2}
-    return display_normals(image, normals, dists)
+function display_normals(normals::Array{T,3}, dists::Matrix{T}) where {T <: AbstractFloat}
+    image = Array{RGB{T}}(undef, size(normals)[2:end]...)::Array{RGB{T}, 2}
+    return display_normals!(image, normals, dists)
 end
 
 canvas = Canvas(10, 10, 0.05, 4)
