@@ -5,18 +5,14 @@ function compute_distance(grid::Matrix{T}, I::CartesianIndex{2}, Ifirst::Cartesi
     Ih = CartesianIndex(0, 1)
 
     Uh = Uv = maxdist
-    for (i, Ii) in enumerate((Ih, Iv))
+    function m(Ii)
         Jfirst = max(I-Ii, Ifirst)
         Ufirst = Jfirst == I ? maxdist : grid[Jfirst]
         Jlast = min(I+Ii, Ilast)
         Ulast = Jlast == I ? maxdist : grid[Jlast]
         Umin = min(Ufirst, Ulast)
-        if i == 1
-            Uh = Umin
-        else
-            Uv = Umin
-        end
     end
+    Uh, Uv = m(Ih), m(Iv)
 
     if Uh < maxdist && Uv < maxdist
         disc = 2*h^2-(Uh-Uv)^2
