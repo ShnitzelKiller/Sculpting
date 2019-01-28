@@ -24,9 +24,8 @@ function compute_distance(grid::Matrix{T}, I::CartesianIndex{2}, Ifirst::Cartesi
     Umin = min(Uv, Uh)
     return min(h+Umin, maxdist)
 end
-function fast_marching!(grid::Matrix{T}, h::Real, maxdist::Real=1) where {T <: AbstractFloat}
+function fast_marching!(states::Matrix{UInt8}, grid::Matrix{T}, h::Real, maxdist::Real) where {T <: AbstractFloat}
     L = PriorityQueue{CartesianIndex{2}, T}()
-    states = zeros(UInt8, size(grid)) #state 0: unvisited, 1: considered, 2: accepted
     for i in eachindex(grid)
         if grid[i] <= 0
             states[i] = 2
@@ -72,4 +71,8 @@ function fast_marching!(grid::Matrix{T}, h::Real, maxdist::Real=1) where {T <: A
         end
     end
     return nothing
+end
+function fast_marching!(grid::Matrix{T}, h::Real, maxdist::Real=1) where {T <: AbstractFloat}
+    states = zeros(UInt8, size(grid))
+    fast_marching!(states, grid, h, maxdist)
 end
