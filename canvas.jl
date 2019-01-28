@@ -22,8 +22,17 @@ function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
     R = CartesianIndices(canvas.grid)
     for I in R
         coords = [I[1],I[2]] * canvas.spacing
-        canvas.grid[I] = (subtract ? max : min)(canvas.grid[I], shape[coords...])
+        if subtract
+            canvas.grid[I] = max(canvas.grid[I], -shape[coords...])
+        else
+            canvas.grid[I] = min(canvas.grid[I], shape[coords...])
+        end
     end
+    return canvas
+end
+
+function displace!(canvas::Canvas, dist::Real)
+    canvas.grid .-= dist
     return canvas
 end
 

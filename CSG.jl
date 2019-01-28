@@ -1,11 +1,11 @@
 using LinearAlgebra
 
 struct Transform{T <: AbstractFloat}
-    rotation :: T
     x :: T
     y :: T
+    rotation :: T
 end
-Transform(r=0.0, x=0.0, y=0.0) = Transform{Float64}(r, x, y)
+Transform(x=0.0, y=0.0, r=0.0) = Transform{Float64}(x, y, r)
 
 function (trans::Transform)(pos::Vector)
     c = cos(trans.rotation)
@@ -13,7 +13,6 @@ function (trans::Transform)(pos::Vector)
     return [c s; -s c] * (pos - [trans.x, trans.y])
 end
 
-import Base.getindex
 
 abstract type CSG{T <: AbstractFloat} end
 
@@ -42,6 +41,7 @@ end
 
 _map(csg::CSG, pos::Vector) = error("_map not implemented for $(typeof(csg))")
 _transform(csg::CSG, pos::Vector) = csg.transform(pos)
+import Base.getindex
 function getindex(csg::T, pos::Real...) where {T <: CSG}
     if @generated
         if in(:transform, fieldnames(T))

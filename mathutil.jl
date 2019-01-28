@@ -14,7 +14,7 @@ function partial!(B, A, dims...)
 end
 
 
-function partial(A, dims...)
-    B = Array{eltype(A)}(undef, length(dims), size(A)...)::Array{eltype(A), ndims(A) + 1}
+function partial(A::Array{T, N}, dims...) where {N, T}
+    B = Array{T}(undef, length(dims), size(A)...)::Array{T, N + 1}
     return partial!(B, A, dims...)
 end

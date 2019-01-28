@@ -1,12 +1,22 @@
 using DataStructures
 
-function compute_distance(grid::Matrix{T}, I, h, maxdist) where {T}
+function compute_distance(grid::Matrix{T}, I::CartesianIndex{2}, Ifirst::CartesianIndex{2}, Ilast::CartesianIndex{2}, h::Real, maxdist::Real) where {T <: AbstractFloat}
     Iv = CartesianIndex(1, 0)
     Ih = CartesianIndex(0, 1)
-    R = CartesianIndices(grid)
-    Ifirst, Ilast = first(R), last(R)
 
-    Uh, Uv = [min([grid[J] for J in (min(I+Ii, Ilast), max(I-Ii, Ifirst)) if J != I]...) for Ii in (Ih, Iv)]
+    Uh = Uv = maxdist
+    for (i, Ii) in enumerate((Ih, Iv))
+        Jfirst = max(I-Ii, Ifirst)
+        Ufirst = Jfirst == I ? maxdist : grid[Jfirst]
+        Jlast = min(I+Ii, Ilast)
+        Ulast = Jlast == I ? maxdist : grid[Jlast]
+        Umin = min(Ufirst, Ulast)
+        if i == 1
+            Uh = Umin
+        else
+            Uv = Umin
+        end
+    end
 
     if Uh < maxdist && Uv < maxdist
         disc = 2*h^2-(Uh-Uv)^2
@@ -18,7 +28,7 @@ function compute_distance(grid::Matrix{T}, I, h, maxdist) where {T}
     Umin = min(Uv, Uh)
     return min(h+Umin, maxdist)
 end
-function fast_marching!(grid::Matrix{T}, h, maxdist=1) where {T}
+function fast_marching!(grid::Matrix{T}, h::Real, maxdist::Real=1) where {T <: AbstractFloat}
     L = PriorityQueue{CartesianIndex{2}, T}()
     states = zeros(UInt8, size(grid)) #state 0: unvisited, 1: considered, 2: accepted
     for i in eachindex(grid)
@@ -39,7 +49,7 @@ function fast_marching!(grid::Matrix{T}, h, maxdist=1) where {T}
              states[min(Ilast, I+Ih)] == 2 ||
              states[min(Ilast, I+Iv)] == 2)
             states[I] = 1
-            dist = compute_distance(grid, I, h, maxdist)
+            dist = compute_distance(grid, I, Ifirst, Ilast, h, maxdist)
             grid[I] = dist
             enqueue!(L, I, dist)
         end
@@ -51,7 +61,7 @@ function fast_marching!(grid::Matrix{T}, h, maxdist=1) where {T}
         for Ii = (Iv, Ih)
             for J = (min(I+Ii, Ilast), max(I-Ii, Ifirst))
                 if states[J] != 2
-                    dist = compute_distance(grid, J, h, maxdist)
+                    dist = compute_distance(grid, J, Ifirst, Ilast, h, maxdist)
                     if dist < grid[J]
                         grid[J] = dist
                         if states[J] == 1
