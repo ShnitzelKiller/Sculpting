@@ -20,13 +20,14 @@ struct Canvas{T <: AbstractFloat}
     dims::Vector{T}
     maxdist::T
     grid::Array{T, 2}
-    function Canvas{T}(height::Real, width::Real, spacing::Real, maxdist::Real=1.0) where {T <: AbstractFloat}
+    function Canvas{T}(height::Real, width::Real, spacing::Real, maxdist::Real) where {T <: AbstractFloat}
         dims = [height, width]
         resolution = Int.(ceil.(dims./spacing))
         grid = fill(maxdist, resolution...)
         new{T}(spacing, dims, maxdist, grid)
     end
 end
+function Canvas(height::Real, width::Real, spacing::Real, maxdist::Real) = Canvas{Float64}(height, width, spacing, maxdist)
 
 function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
     R = CartesianIndices(canvas.grid)
@@ -34,6 +35,7 @@ function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
         coords = [I[1],I[2]] * canvas.spacing
         canvas.grid[I] = (subtract ? max : min)(canvas.grid[I], shape[coords...])
     end
+    return canvas
 end
 
 function update!(canvas::Canvas)
@@ -41,4 +43,5 @@ function update!(canvas::Canvas)
     canvas.grid .= -canvas.grid
     fast_marching!(canvas.grid, canvas.spacing, canvas.maxdist)
     canvas.grid .= -canvas.grid
+    return canvas
 end
