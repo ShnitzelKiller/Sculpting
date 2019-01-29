@@ -29,4 +29,4 @@ update_sdf!(canvas)
 update_normals!(canvas)
 displace!(canvas, -1.0)
 image = display_normals(canvas.normals, canvas.grid);
-plot(image)
+plot(image, aspect_ratio=:equal)

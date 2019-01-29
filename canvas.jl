@@ -20,12 +20,12 @@ Canvas(height::Real, width::Real, spacing::Real, maxdist::Real) = Canvas{Float64
 
 function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
     R = CartesianIndices(canvas.grid)
+    t(coord) = (coord[1]*canvas.spacing, coord[2]*canvas.spacing)
     for I in R
-        coords = [I[1],I[2]] * canvas.spacing
         if subtract
-            canvas.grid[I] = max(canvas.grid[I], -shape[coords...])
+            canvas.grid[I] = max(canvas.grid[I], -shape[t(I)...])
         else
-            canvas.grid[I] = min(canvas.grid[I], shape[coords...])
+            canvas.grid[I] = min(canvas.grid[I], shape[t(I)...])
         end
     end
     return canvas
