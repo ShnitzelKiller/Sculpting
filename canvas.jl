@@ -49,9 +49,7 @@ function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
 end
 
 function displace!(canvas::Canvas, dist::Real)
-    for I in CartesianIndices(canvas.grid)
-        canvas.grid[I] -= dist
-    end
+    canvas.grid .-= dist
     update!(canvas)
     return canvas
 end

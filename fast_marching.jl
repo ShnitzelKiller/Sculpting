@@ -73,6 +73,6 @@ function fast_marching!(states::Matrix{UInt8}, grid::Matrix{T}, h::Real, maxdist
     return nothing
 end
 function fast_marching!(grid::Matrix{T}, h::Real, maxdist::Real=1) where {T <: AbstractFloat}
-    states = zeros(UInt8, size(grid))
+    states = zeros(UInt8, size(grid))::Matrix{UInt8}
     fast_marching!(states, grid, h, maxdist)
 end
