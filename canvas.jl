@@ -18,31 +18,6 @@ struct Canvas{T <: AbstractFloat}
 end
 Canvas(height::Real, width::Real, spacing::Real, maxdist::Real) = Canvas{Float64}(height, width, spacing, maxdist)
 
-function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
-    R = CartesianIndices(canvas.grid)
-    t(coord) = (coord[1]*canvas.spacing, coord[2]*canvas.spacing)
-    for I in R
-        if subtract
-            canvas.grid[I] = max(canvas.grid[I], -shape[t(I)...])
-        else
-            canvas.grid[I] = min(canvas.grid[I], shape[t(I)...])
-        end
-    end
-    return canvas
-end
-
-function displace!(canvas::Canvas, dist::Real, selector=(x, y)->1.0)
-    for I in CartesianIndices(canvas.grid)
-        canvas.grid[I] -= dist * selector(canvas.normals[1,I], canvas.normals[2,I])
-    end
-    return canvas
-end
-
-function clear!(canvas::Canvas)
-    canvas.grid .= canvas.maxdist
-    return canvas
-end
-
 function update_sdf!(canvas::Canvas)
     fast_marching!(canvas.grid, canvas.spacing, canvas.maxdist)
     canvas.grid .= -canvas.grid
@@ -53,4 +28,44 @@ end
 
 function update_normals!(canvas::Canvas)
     canvas.normals .= partial(canvas.grid, 1, 2) / canvas.spacing
+end
+function update!(canvas::Canvas)
+    update_sdf!(canvas)
+    update_normals!(canvas)
+end
+
+function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
+    R = CartesianIndices(canvas.grid)
+    t(coord) = (coord[1]*canvas.spacing, coord[2]*canvas.spacing)
+    for I in R
+        if subtract
+            canvas.grid[I] = max(canvas.grid[I], -shape[t(I)...])
+        else
+            canvas.grid[I] = min(canvas.grid[I], shape[t(I)...])
+        end
+    end
+    update!(canvas)
+    return canvas
+end
+
+function displace!(canvas::Canvas, dist::Real)
+    for I in CartesianIndices(canvas.grid)
+        canvas.grid[I] -= dist
+    end
+    update!(canvas)
+    return canvas
+end
+
+function displace!(canvas::Canvas, dist::Real, selector)
+    for I in CartesianIndices(canvas.grid)
+        canvas.grid[I] -= dist * selector(canvas.normals[1,I], canvas.normals[2,I])
+    end
+    update!(canvas)
+    return canvas
+end
+
+function clear!(canvas::Canvas)
+    canvas.grid .= canvas.maxdist
+    canvas.normals .= NaN
+    return canvas
 end

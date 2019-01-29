@@ -8,8 +8,9 @@ Transform(x=0.0, y=0.0, r=0.0) = Transform{Float64}(x, y, r)
 function (trans::Transform)(posx::Real, posy::Real)
     c = cos(trans.rotation)
     s = sin(trans.rotation)
-    newpos = (c * posx + s * posy - trans.x,
-              -s * posx + c * posy - trans.y)
+    posx, posy = (posx-trans.x, posy-trans.y)
+    newpos = (c * posx + s * posy,
+              -s * posx + c * posy)
     return newpos
 end
 
@@ -57,7 +58,7 @@ _map(csg::Circle, posx::Real, posy::Real) = sqrt(posx*posx+posy*posy) - csg.radi
 function _map(csg::Square, pos::Vararg{Real, 2})
     inside = max(abs.(pos)...) - csg.radius
     disp = max.(abs.(pos) .- csg.radius, 0)
-    return min(inside, 0) + norm(disp)
+    return min(inside, 0) + sqrt(disp[1]*disp[1]+disp[2]*disp[2])
 end
 _map(csg::Intersect, pos::Vararg{Real, 2}) = maximum(child[pos...] for child in csg.children)
 _map(csg::Union, pos::Vararg{Real, 2}) = minimum(child[pos...] for child in csg.children)
