@@ -31,8 +31,10 @@ function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
     return canvas
 end
 
-function displace!(canvas::Canvas, dist::Real)
-    canvas.grid .-= dist
+function displace!(canvas::Canvas, dist::Real, selector=(x, y)->1.0)
+    for I in CartesianIndices(canvas.grid)
+        canvas.grid[I] -= dist * selector(canvas.normals[1,I], canvas.normals[2,I])
+    end
     return canvas
 end
 
