@@ -34,14 +34,28 @@ function update!(canvas::Canvas)
     update_normals!(canvas)
 end
 
-function draw!(canvas::Canvas, shape::CSG, subtract::Bool=false)
+function draw!(canvas::Canvas, shape::CSG; subtract::Bool=false, smoothness::Real=0)
     R = CartesianIndices(canvas.grid)
     t(coord) = (coord[1]*canvas.spacing, coord[2]*canvas.spacing)
-    for I in R
+    if smoothness <= 0
         if subtract
-            canvas.grid[I] = max(canvas.grid[I], -shape[t(I)...])
+            for I in R
+                canvas.grid[I] = max(canvas.grid[I], -shape[t(I)...])
+            end
         else
-            canvas.grid[I] = min(canvas.grid[I], shape[t(I)...])
+            for I in R
+                canvas.grid[I] = min(canvas.grid[I], shape[t(I)...])
+            end
+        end
+    else
+        if subtract
+            for I in R
+                canvas.grid[I] = log(exp(canvas.grid[I]/smoothness) + exp(-shape[t(I)...]/smoothness))*smoothness
+            end
+        else
+            for I in R
+                canvas.grid[I] = -log(exp(-canvas.grid[I]/smoothness) + exp(-shape[t(I)...]/smoothness))*smoothness
+            end
         end
     end
     update!(canvas)
