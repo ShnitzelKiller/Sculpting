@@ -44,17 +44,22 @@ Returns a SurfaceField:
 Example code:
 """
 
-def PineCone(Solid):
-	outerarea = Sphere()
-	mask = Blur(Translate(Sphere(), (0,1,0)), 1)
-	surfmask = Select(outerarea, mask)
-	outerarea = MoveSurface(outerarea, surfmask, (0,1,0)) #this makes kind of like a really smoothed cone with a round bottom
+from frontend import *
 
-	spines = Empty()
-	spine = scale(Cube(), (0.1, 1, 0.1))
 
-	for n in range(1,50):
-		nextspine = Translate(Rotate(spine, something), something) #basically making the spines stick out from the center sort of
-		spines = Union(spines, nextspine)
+outerarea = Sphere()
+cone = Translate(Cone, (0,1,0))
 
-	return Intersect(spines, outerarea)
+outerarea = Union(outerarea, cone)
+
+spines = Empty()
+spine = Scale(Cube(), (0.1, 1, 0.1))
+
+for n in range(1,50):
+	nextspine = Translate(spine, (0,n%10,0))
+	spines = Union(spines, nextspine)
+
+
+unused = Subtract(Sphere(), Cube())
+
+Output(Intersect(spines, outerarea))
