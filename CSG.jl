@@ -20,8 +20,16 @@ end
 struct Intersect{T} <: CSG{T}
     children :: Vector{CSG{T}}
 end
+struct SoftIntersect{T} <: CSG{T}
+    children :: Vector{CSG{T}}
+    smoothness :: T
+end
 struct Union{T} <: CSG{T}
     children :: Vector{CSG{T}}
+end
+struct SoftUnion{T} <: CSG{T}
+    children :: Vector{CSG{T}}
+    smoothness :: T
 end
 struct Negate{T} <: CSG{T}
     child :: CSG{T}
@@ -45,5 +53,7 @@ function getindex(csg::Square, pos::Vararg{Real, 2})
     return min(inside, 0) + sqrt(disp[1]*disp[1]+disp[2]*disp[2])
 end
 getindex(csg::Intersect, pos::Vararg{Real, 2}) = maximum(child[pos...] for child in csg.children)
+getindex(csg::SoftIntersect, pos::Vararg{Real, 2}) = csg.smoothness*log(sum(exp(child[pos...]/csg.smoothness) for child in csg.children))
 getindex(csg::Union, pos::Vararg{Real, 2}) = minimum(child[pos...] for child in csg.children)
+getindex(csg::SoftUnion, pos::Vararg{Real, 2}) = -csg.smoothness*log(sum(exp(-child[pos...]/csg.smoothness) for child in csg.children))
 getindex(csg::Negate, pos::Vararg{Real, 2}) = -csg.child[pos...]
