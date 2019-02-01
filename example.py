@@ -23,23 +23,14 @@ Returns a Solid:
 	Union(Solid, Solid), Intersect(Solid, Solid) etc.
 	Sharpen(Field, float threshold): all areas in the field >= threshold are part of the resulting Solid
 
-	ExtrudeSurface(Solid, Surface, vector): moves the surface according to vector, and creates new (straight, sharp edge) surface between old and new boundary
-	MoveSurface(Solid, SurfaceField, vector): moves the surface by vector*field at each point, this is better for smoother extrusions
-	SmoothSurface(Solid, SurfaceField, radius): smoothes out sharp edges on the surface, radius is multiplied by the field at each point
+	MoveSurface(Solid, Field, vector): moves the solid's surface by vector - the area moved is defined by the field mask
+	SmoothSurface(Solid, Field, radius): smoothes out sharp edges on the surface, radius is multiplied by the field at each point (does this work?)
 
 Returns a Field:
-	FromSolid(Solid): gives a field with 0-1 values only (maybe antialiased if we use a grid representation)
+	SolidToField(Solid): gives a field with 0-1 values only (maybe antialiased if we use a grid representation)
 	Blur(Field, radius): 3d gaussian blur of a field (maybe mask with a second field?)
+	Translate(Field, vector), Rotate Scale etc
 	Add(Field, Field), Subtract(Field, Field), Min(Field, Field), Max(Field, Field) etc.
-
-Returns a Surface:
-	Select(Solid owner, Solid mask): returns a surface on owner containing areas within mask
-	Union(Surface, Surface) etc.
-
-Returns a SurfaceField:
-	FromSurface(Surface): gives a surfaceField with 0-1 values only (maybe antialiased if we use a grid representation)
-	Select(Solid owner, Field mask): returns a surface on owner with values based on mask
-	Add(SurfaceField) etc.
 
 Example code:
 """
@@ -48,7 +39,7 @@ from frontend import *
 
 
 outerarea = Sphere()
-cone = Translate(Cone, (0,1,0))
+cone = Translate(Cone(), (0,1,0))
 
 outerarea = Union(outerarea, cone)
 
@@ -61,5 +52,10 @@ for n in range(1,50):
 
 
 unused = Subtract(Sphere(), Cube())
+
+areafield = SolidToField(outerarea)
+blurred = BlurField(areafield, 2)
+
+spines = MoveSurface(spines, blurred, (1,0,1))
 
 Output(Intersect(spines, outerarea))

@@ -3,63 +3,112 @@ from typing import List,Dict,Tuple
 
 Vec3 = Tuple[float,float,float]
 Mat3 = Tuple[Vec3,Vec3,Vec3]
+Transformation = Tuple[Mat3, Vec3]
 
-class Solid:
-    def __init__(self, iid, args):
-        self.id = iid
+class Flyweight:
+    def __init__(self, id_, args):
+        self.id = id_
         self.args = args
 
     def __repr__(self):
         return self.id
 
-args_to_solid: Dict[str, Solid] = {}
-create_order: List[Solid] = []
+class Solid(Flyweight):
+    prefix = "S"
+    def __init__(self, *args):
+        Flyweight.__init__(self, *args)
 
+class Field(Flyweight):
+    prefix = "F"
+    def __init__(self, *args):
+        Flyweight.__init__(self, *args)
 
-def GetSolid(*args) -> Solid:
-    if args not in args_to_solid:
-        next_id = "S"+str(len(args_to_solid))
-        next_solid = Solid(next_id, args) 
-        args_to_solid[args] = next_solid
+created_objects = {}
+create_order = []
+
+def GetObj(typ, *args):
+    if typ not in (Solid, Field):
+        raise Exception("invalid")
+    if args not in created_objects:
+        next_id = typ.prefix+str(len(created_objects))
+        next_solid = typ(next_id, args) 
+        created_objects[args] = next_solid
         create_order.append(next_solid)
-    return args_to_solid[args]
+    return created_objects[args]
+
+
+
+#python type checking is NOT actually enforced, TODO make function generator that checks types
+
+#works for either solid or field
+#todo: optimize multiple translate/transform in sequence
+def Transform(s, by: Transformation):
+    return GetObj(type(s), "transform", s, by)
+
+def Translate(s, by: Vec3):
+    return Transform(s, ( ((1,0,0), (0,1,0), (0,0,1)), by ) )
+
+def Scale(s, by: Vec3):
+    return Transform(s, ( ((by[0],0,0), (0,by[1],0), (0,0,by[2])), (0,0,0) ) )
 
 
 
 def Empty() -> Solid:
-    return GetSolid("empty")
+    return GetObj(Solid, "empty")
 
 def Sphere() -> Solid:
-    return GetSolid("sphere")
+    return GetObj(Solid, "sphere")
 
 def Cube() -> Solid:
-    return GetSolid("cube")
+    return GetObj(Solid, "cube")
 
 def Cone() -> Solid:
-    return GetSolid("cone")
+    return GetObj(Solid, "cone")
 
-
-#todo: optimize multiple translate/transform in sequence
-def Translate(s: Solid, by: Vec3) -> Solid:
-    return GetSolid("translate", s, by)
-
-def Transform(s: Solid, by: Mat3) -> Solid:
-    return GetSolid("transform", s, by)
-
-def Scale(s: Solid, by: Vec3) -> Solid:
-    return Transform(s, ((by[0],0,0), (0,by[1],0), (0,0,by[2])))
-
+def Cylinder() -> Solid:
+    return GetObj(Solid, "cylinder")
 
 
 def Union(*solids: Solid) -> Solid:
-    return GetSolid("union", *solids)
+    return GetObj(Solid, "union", *solids)
 
 def Intersect(*solids: Solid) -> Solid:
-    return GetSolid("intersect", *solids)
+    return GetObj(Solid, "intersect", *solids)
 
 def Subtract(a: Solid, b: Solid) -> Solid:
-    return GetSolid("subtract", a, b)
+    return GetObj(Solid, "subtract", a, b)
 
+def MoveSurface(s: Solid, mask: Field, by: Vec3) -> Solid:
+    return GetObj(Solid, "movesurface", s, mask)
+
+
+def UniformField(v: float) -> Field:
+    return GetObj(Field, "uniform", v)
+
+def SolidToField(a: Solid) -> Field:
+    return GetObj(Field, "fromsolid", a)
+
+
+def BlurField(a: Field, by: float) -> Field:
+    return GetObj(Field, "blur", a, by)
+
+def Add(a: Field, b: Field) -> Field:
+    return GetObj(Field, "add", a, b)
+
+def Sub(a: Field, b: Field) -> Field:
+    return GetObj(Field, "sub", a, b)
+
+def Mul(a: Field, b: Field) -> Field:
+    return GetObj(Field, "mul", a, b)
+
+def Max(a: Field, b: Field) -> Field:
+    return GetObj(Field, "max", a, b)
+
+def Min(a: Field, b: Field) -> Field:
+    return GetObj(Field, "min", a, b)
+
+def Invert(a: Field) -> Field:
+    return Sub(UniformField(1), a)
 
 
 def Output(final: Solid):
@@ -90,10 +139,10 @@ def Output(final: Solid):
     print("Output "+final.id)
 
 
-def MarkUsed(used, s: Solid):
+def MarkUsed(used, s):
     if s not in used:
         used.add(s)
     for arg in s.args:
-        if type(arg) is Solid:
+        if issubclass(type(arg), Flyweight):
             MarkUsed(used, arg)
 
