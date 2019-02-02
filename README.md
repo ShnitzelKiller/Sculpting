@@ -1,5 +1,6 @@
 # 2D Sculpting
 
+## Sculpting prototype
 To see the results of the python implementation, run
 ```
 python canvas.py
@@ -16,4 +17,5 @@ in the Julia REPL. Then you can run `include("canvas.jl")` in a new notebook, or
 Here is an example of the output of the sculpting prototype system:
 ![Abstract mushroom](step5.jpg)
 
-Some code for optimizing the intermediate representation is found in `frontend.py`, and an example program using this frontend is in `example.py`.
+## DSL code
+A frontend that optimizes the intermediate representation is found in `frontend.py`, and an example program using this frontend is in `example.py`.
