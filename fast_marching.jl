@@ -4,13 +4,12 @@ function compute_distance(grid::Matrix{T}, I::CartesianIndex{2}, Ifirst::Cartesi
     Iv = CartesianIndex(1, 0)
     Ih = CartesianIndex(0, 1)
 
-    Uh = Uv = maxdist
     function m(Ii)
         Jfirst = max(I-Ii, Ifirst)
         Ufirst = Jfirst == I ? maxdist : grid[Jfirst]
         Jlast = min(I+Ii, Ilast)
         Ulast = Jlast == I ? maxdist : grid[Jlast]
-        Umin = min(Ufirst, Ulast)
+        return min(Ufirst, Ulast)
     end
     Uh, Uv = m(Ih), m(Iv)
 
