@@ -37,17 +37,16 @@ Example code:
 
 from frontend import *
 
-
 outerarea = Sphere()
-cone = Translate(Cone(), (0,1,0))
+cone = Translate(Cone(), Vec3(0,1,0))
 
 outerarea = Union(outerarea, cone)
 
 spines = Empty()
-spine = Scale(Cube(), (0.1, 1, 0.1))
+spine = Scale(Cube(), Vec3(0.1, 1, 0.1))
 
 for n in range(1,50):
-	nextspine = Translate(spine, (0,n%10,0))
+	nextspine = Translate(spine, Vec3(0,n%10,0))
 	spines = Union(spines, nextspine)
 
 
@@ -56,6 +55,6 @@ unused = Subtract(Sphere(), Cube())
 areafield = SolidToField(outerarea)
 blurred = BlurField(areafield, 2)
 
-spines = MoveSurface(spines, blurred, (1,0,1))
+spines = MoveSurface(spines, blurred, Vec3(1,0,1))
 
 Output(Intersect(spines, outerarea))

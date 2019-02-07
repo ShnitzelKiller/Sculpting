@@ -1,114 +1,145 @@
 
-from typing import List,Dict,Tuple
+class Vec3:
+    def __init__(self, x, y, z):
+        self.x=float(x)
+        self.y=float(y)
+        self.z=float(z)
 
-Vec3 = Tuple[float,float,float]
-Mat3 = Tuple[Vec3,Vec3,Vec3]
-Transformation = Tuple[Mat3, Vec3]
+class Mat3:
+    def __init__(self, x, y, z):
+        assert(type(x)==Vec3 and type(y)==Vec3 and type(z)==Vec3)
+        self.x=x
+        self.y=y
+        self.z=z
 
-class Flyweight:
-    def __init__(self, id_, args):
+class Transformation:
+    def __init__(self,matrix,translation):
+        assert(type(matrix) == Mat3 and type(translation) == Vec3)
+        self.matrix = matrix
+        self.translation = translation
+
+
+class Solid:
+    prefix = "S"
+    def __init__(self, id_, discrete, args):
         self.id = id_
         self.args = args
+        self.discrete = discrete
 
     def __repr__(self):
         return self.id
 
-class Solid(Flyweight):
-    prefix = "S"
-    def __init__(self, *args):
-        Flyweight.__init__(self, *args)
-
-class Field(Flyweight):
+class Field:
     prefix = "F"
-    def __init__(self, *args):
-        Flyweight.__init__(self, *args)
+    def __init__(self, id_, discrete, args):
+        self.id = id_
+        self.args = args
+        self.discrete = discrete
+
+    def __repr__(self):
+        return self.id
 
 created_objects = {}
 create_order = []
 
-def GetObj(typ, *args):
+def GetObject(typ, ir, args):
     if typ not in (Solid, Field):
         raise Exception("invalid")
     if args not in created_objects:
         next_id = typ.prefix+str(len(created_objects))
-        next_solid = typ(next_id, args) 
-        created_objects[args] = next_solid
-        create_order.append(next_solid)
+        next_obj = typ(next_id, ir, args) 
+        created_objects[args] = next_obj
+        create_order.append(next_obj)
     return created_objects[args]
 
+OperationRegistry = {}
+def DoOperation(name, args):
+    for func,argtypes in OperationRegistry[name]:
+        if len(args) == len(argtypes):
+            fixedargs = []
+            for i in range(0,len(args)):
+                if type(argtypes[i]) == tuple:
+                    if type(args[i]) == argtypes[i][0]:
+                        if argtypes[i][1] and not args[i].discrete:
+                            fixedargs.append(Discretize(args[i]))
+                        else:
+                            fixedargs.append(args[i])
+                    else:
+                        break
+                else:
+                    if type(args[i]) == argtypes[i]:
+                        fixedargs.append(args[i])
+                    elif argtypes[i] == float:
+                        fixedargs.append(float(args[i]))
+                    else:
+                        break
+            else:
+                return func(fixedargs)
+    raise Exception("Invalid arguments: ", name, type(args), args)
 
+def AddOperation(name, returntype, argtypes=[], body=False):
+    def checktypearg(typearg):
+        assert(type(typearg) in (type, tuple))
+        if type(typearg) == type:
+            assert(typearg not in (Solid, Field))
+        else:
+            assert(len(typearg) == 2)
+            assert(typearg[0] in (Solid, Field))
+            assert(type(typearg[1])==bool)
+    assert(type(name) == str)
+    assert(type(argtypes) == list)
+    assert(type(returntype) == tuple)
+    checktypearg(returntype)
+    for arg in argtypes:
+        checktypearg(arg)
 
-#python type checking is NOT actually enforced, TODO make function generator that checks types
+    
+
+    if body==False:
+        def tempbody(args):
+            return GetObject(returntype[0],returntype[1],(name,*args))
+        body = tempbody
+
+    assert(callable(body))
+
+    if name not in OperationRegistry:
+        OperationRegistry[name] = []
+
+        def temp(*args):
+            return DoOperation(name, args)
+
+        globals()[name] = temp
+
+    OperationRegistry[name].append( (body, argtypes) )
 
 #works for either solid or field
 #todo: optimize multiple translate/transform in sequence
-def Transform(s, by: Transformation):
-    return GetObj(type(s), "transform", s, by)
 
-def Translate(s, by: Vec3):
-    return Transform(s, ( ((1,0,0), (0,1,0), (0,0,1)), by ) )
-
-def Scale(s, by: Vec3):
-    return Transform(s, ( ((by[0],0,0), (0,by[1],0), (0,0,by[2])), (0,0,0) ) )
+for ObjType in (Solid, Field):
+    AddOperation("Discretize", (ObjType, True), [(ObjType, False)])
+    AddOperation("Transform", (ObjType, False), [(ObjType, False), Transformation])
+    AddOperation("Translate", (ObjType, False), [(ObjType, False), Vec3], lambda args: Transform(args[0], Transformation(Mat3(Vec3(1,0,0),Vec3(0,1,0),Vec3(0,0,1)),args[1])) )
+    AddOperation("Scale", (ObjType, False), [(ObjType, False), Vec3], lambda args: Transform(args[0], Transformation(Mat3(Vec3(args[1].x,0,0),Vec3(0,args[1].y,0),Vec3(0,0,args[1].z)),Vec3(0,0,0))) )
 
 
+for primitive in ["Empty","Sphere","Cube","Cone","Cylinder"]:
+    AddOperation(primitive, (Solid, False))
 
-def Empty() -> Solid:
-    return GetObj(Solid, "empty")
+for setoperation in ["Union","Intersect","Subtract"]:
+    AddOperation(setoperation, (Solid, False), [(Solid, False), (Solid, False)])
 
-def Sphere() -> Solid:
-    return GetObj(Solid, "sphere")
+AddOperation("MoveSurface", (Solid, True), [(Solid, True), (Field, False), Vec3])
 
-def Cube() -> Solid:
-    return GetObj(Solid, "cube")
+AddOperation("UniformField", (Field, False), [float])
 
-def Cone() -> Solid:
-    return GetObj(Solid, "cone")
+AddOperation("SolidToField", (Field, False), [(Solid, False)])
 
-def Cylinder() -> Solid:
-    return GetObj(Solid, "cylinder")
+AddOperation("BlurField", (Field, True), [(Field, True), float])
 
+for fieldoperation in ["Add", "Subtract", "Multiply", "Max", "Min"]:
+    AddOperation(fieldoperation, (Field, False), [(Field, False), (Field, False)])
 
-def Union(*solids: Solid) -> Solid:
-    return GetObj(Solid, "union", *solids)
-
-def Intersect(*solids: Solid) -> Solid:
-    return GetObj(Solid, "intersect", *solids)
-
-def Subtract(a: Solid, b: Solid) -> Solid:
-    return GetObj(Solid, "subtract", a, b)
-
-def MoveSurface(s: Solid, mask: Field, by: Vec3) -> Solid:
-    return GetObj(Solid, "movesurface", s, mask)
-
-
-def UniformField(v: float) -> Field:
-    return GetObj(Field, "uniform", v)
-
-def SolidToField(a: Solid) -> Field:
-    return GetObj(Field, "fromsolid", a)
-
-
-def BlurField(a: Field, by: float) -> Field:
-    return GetObj(Field, "blur", a, by)
-
-def Add(a: Field, b: Field) -> Field:
-    return GetObj(Field, "add", a, b)
-
-def Sub(a: Field, b: Field) -> Field:
-    return GetObj(Field, "sub", a, b)
-
-def Mul(a: Field, b: Field) -> Field:
-    return GetObj(Field, "mul", a, b)
-
-def Max(a: Field, b: Field) -> Field:
-    return GetObj(Field, "max", a, b)
-
-def Min(a: Field, b: Field) -> Field:
-    return GetObj(Field, "min", a, b)
-
-def Invert(a: Field) -> Field:
-    return Sub(UniformField(1), a)
+AddOperation("Invert", (Field, False), [(Field, False)])
 
 
 def Output(final: Solid):
@@ -143,6 +174,6 @@ def MarkUsed(used, s):
     if s not in used:
         used.add(s)
     for arg in s.args:
-        if issubclass(type(arg), Flyweight):
+        if type(arg) in (Solid, Field):
             MarkUsed(used, arg)
 
