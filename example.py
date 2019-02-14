@@ -37,24 +37,27 @@ Example code:
 
 from frontend import *
 
-outerarea = Sphere()
-cone = Translate(Cone(), Vec3(0,1,0))
+def make_thing():
+	thing = Circle()
+	for i in range(0,360,45):
+		leaf = Scale(Circle(), Vec2(0.5,0.5))
+		leaf = Translate(leaf, Vec2(0,1))
+		leaf = Rotate(leaf, i)
+		thing = Union(thing, leaf)
+	return Subtract(thing, Scale(Circle(),Vec2(0.5,0.5)))
 
-outerarea = Union(outerarea, cone)
+shape = Empty()
 
-spines = Empty()
-spine = Scale(Cube(), Vec3(0.1, 1, 0.1))
+for n in range(5):
+	scale = 1.0/(n+1)
+	shape = Union(shape, Translate(Scale(make_thing(), Vec2(scale,scale)), Vec2(0, n)))
 
-for n in range(1,50):
-	nextspine = Translate(spine, Vec3(0,n%10,0))
-	spines = Union(spines, nextspine)
+selection = Translate(Scale(Square(), Vec2(2, 10)), Vec2(2, 0))
+selection = SolidToField(selection)
+blurred = BlurField(selection, 1)
 
+unused = BlurField(selection, 10)
 
-unused = Subtract(Sphere(), Cube())
+final = ExpandSurface(shape, selection, 0.5)
 
-areafield = SolidToField(outerarea)
-blurred = BlurField(areafield, 2)
-
-spines = MoveSurface(spines, blurred, Vec3(1,0,1))
-
-Output(Intersect(spines, outerarea))
+Output(final)
