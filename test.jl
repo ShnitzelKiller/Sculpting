@@ -16,17 +16,13 @@ function display_normals(normals::Array{T,3}, dists::Matrix{T}) where {T <: Abst
 end
 
 canvas = Canvas(10, 10, 0.05, 4)
-circle1 = Circle(3.0, Transform(5, 5))
-circle2 = Circle(3.0, Transform(5, 7))
-shape = Intersect([circle1, Negate(circle2)], Transform())
+circle1 = Transform(Circle(3.0), 5, 5)
+circle2 = Transform(Circle(3.0), 5, 7)
+shape = Intersect([circle1, Negate(circle2)])
 draw!(canvas, shape)
-update_sdf!(canvas)
-update_normals!(canvas)
 displace!(canvas, 1.0)
-square = Square(1.0, Transform(5, 5))
-draw!(canvas, square, true)
-update_sdf!(canvas)
-update_normals!(canvas)
+square = Transform(Square(1.0), 5, 5)
+draw!(canvas, square, subtract=true)
 displace!(canvas, -1.0)
 image = display_normals(canvas.normals, canvas.grid);
 plot(image, aspect_ratio=:equal)

@@ -6,7 +6,7 @@ struct Transform{T} <: CSG{T}
     y :: T
     rotation :: T
 end
-Transform(child::CSG, x::Real, y::Real, r::Real=0.0) = Transform{Float64}(child, x, y, r)
+Transform(child::CSG{T}, x::Real, y::Real, r::Real=0.0) where {T} = Transform{T}(child, x, y, r)
 
 struct Circle{T} <: CSG{T}
     radius :: T
