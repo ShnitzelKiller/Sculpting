@@ -57,6 +57,7 @@ selection = SolidToField(selection)
 blurred = BlurField(selection, 1)
 
 unused = BlurField(selection, 10)
+alsounused = Union(shape, Circle(), make_thing(), Square())
 
 final = ExpandSurface(shape, selection, 0.5)
 

@@ -16,7 +16,7 @@ class Bounds:
         return BBox(Vec2.vmin(*corners), Vec2.vmax(*corners))
 
     def merge(self, other):
-        return BBox(Vec2.vmin(self.lo,other.lo),Vec2.vmax(self.hi,other.hi))
+        return Bounds(Vec2.vmin(self.lo,other.lo),Vec2.vmax(self.hi,other.hi))
 
 class Vec2:
     def __init__(self, x, y):
@@ -115,7 +115,7 @@ class Transformation:
 IF_INPUTS_VALID = 3
 
 class Node:
-    def __init__(self, id_, fn, args, bounds, requires_valid_sdf, outputs_valid_sdf):
+    def __init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, outputs_valid_sdf=True):
         self.id = id_
         self.fn = fn
         self.args = args
@@ -146,31 +146,31 @@ class Node:
 
 class Solid(Node):
     prefix = "S"
-    def __init__(self, id_, fn, args, bounds, requires_valid_sdf, outputs_valid_sdf):
-        Node.__init__(self, id_, fn, args, bounds, requires_valid_sdf, outputs_valid_sdf)
+    def __init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, outputs_valid_sdf, solid_outside_bounds):
+        Node.__init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, outputs_valid_sdf=outputs_valid_sdf)
+        self.solid_outside_bounds = solid_outside_bounds
 
 
 class Field(Node):
     prefix = "F"
-    def __init__(self, id_, fn, args, bounds, oob_value, requires_valid_sdf):
-        #field doesn't output with an sdf, True is filler
-        Node.__init__(self, id_, fn, args, bounds, requires_valid_sdf, True)
-        self.oob_value = oob_value
+    def __init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, value_outside_bounds):
+        Node.__init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf)
+        self.value_outside_bounds = value_outside_bounds
+
 
 
 created_objects = {}
 create_order = []
 
-def GetObject(typ, fn, args,requires_valid_sdf, outputs_valid_sdf):
+def GetObject(typ, fn, args, cfs):
     args = tuple(args)
     if typ not in (Solid, Field):
         raise Exception("invalid")
     if args not in created_objects:
         next_id = typ.prefix+str(len(created_objects))
-        if typ==Solid:
-            next_obj = Solid(next_id, fn, args, False, requires_valid_sdf, outputs_valid_sdf)
-        else:
-            next_obj = Field(next_id, fn, args, False, 0, requires_valid_sdf)
+
+        next_obj = typ(next_id, fn, args, **{k:(cfs.__dict__[k](args)) for k in cfs.__dict__})
+
         created_objects[args] = next_obj
         create_order.append(next_obj)
     return created_objects[args]
@@ -198,74 +198,103 @@ def DoOperation(name, args):
                 return func(fixedargs)
     raise Exception("Invalid arguments: ", name, type(args), args)
 
-def AddOperation(name, returntype, argtypes, translate_function=None, requires_valid_sdf=False, outputs_valid_sdf=IF_INPUTS_VALID):
+
+#class OperationData:
+    #__init__(self, func,)
+
+#  **a.__dict__
+
+def wrap(val):
+    return lambda *args: val
+
+class Obj(object):
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+def AddOperation(name, returntype, argtypes, bounds="TEMP" ,
+                                    sample_cost_fn_fn=(lambda args: ( lambda node: 1+sum([n.sample_cost() for n in node.input_nodes]) ) ), 
+                                    requires_valid_sdf=False,
+                                    outputs_valid_sdf=IF_INPUTS_VALID,
+                                    solid_outside_bounds=False,
+                                    value_outside_bounds=0):
     assert(type(name) == str)
     assert(type(argtypes) == list)
     assert(returntype in (Solid, Field))
     for arg in argtypes:
         assert(type(arg) == type)
 
-    # if not callable(outputs_valid_sdf):
-    #     if type(outputs_valid_sdf)==bool:
-    #         ok = outputs_valid_sdf
-    #         def tempfn(args):
-    #             return ok
-    #         outputs_valid_sdf = tempfn
-    #     if outputs_valid_sdf is None:
-    #         def tempfn(args):
-    #             valid=True
-    #             for a in args:
-    #                 if type(a)==Solid:
-    #                     valid = valid and a.valid_sdf
-    #             return valid
-    #         outputs_valid_sdf = tempfn
-    # assert(callable(outputs_valid_sdf))
+    #assert(callable(bounds) or type(bounds)==Bounds)
+    if not callable(bounds):
+        bounds = wrap(bounds)
+        
+    assert(callable(sample_cost_fn_fn))
 
-    # if not callable(sample_cost):
-    #     def tempfn(args):
-    #         cost = 1
-    #         for a in args:
-    #             if type(a) in (Solid, Field):
-    #                 cost += a.sample_cost()
-    #         return cost
-    #     sample_cost = tempfn
-    # assert(callable(sample_cost))
+    assert(callable(requires_valid_sdf) or type(requires_valid_sdf) is bool)
+    if not callable(requires_valid_sdf):
+        requires_valid_sdf = wrap(requires_valid_sdf)
 
     assert(callable(outputs_valid_sdf) or type(outputs_valid_sdf) is bool or outputs_valid_sdf==IF_INPUTS_VALID)
-
+    assert returntype==Solid or outputs_valid_sdf==IF_INPUTS_VALID, "Function returns a field which has no SDF"
     if not callable(outputs_valid_sdf):
-        output_type = outputs_valid_sdf
-        def outputs_valid_sdf(args):
-            return output_type
+        outputs_valid_sdf = wrap(outputs_valid_sdf)
 
-    if translate_function==None:
-        def translate_function(args):
-            return GetObject(returntype,name,args,requires_valid_sdf,outputs_valid_sdf(args))
-    assert(callable(translate_function))
+    assert(callable(solid_outside_bounds) or type(solid_outside_bounds) is bool)
+    assert returntype==Solid or solid_outside_bounds==False, "Field can't be solid outside bounds"
+    if not callable(solid_outside_bounds):
+        solid_outside_bounds = wrap(solid_outside_bounds)
 
+    assert(callable(value_outside_bounds) or type(value_outside_bounds) in (float,int))
+    assert returntype==Field or value_outside_bounds==0, "Solid can't have value outside bounds"
+    if not callable(value_outside_bounds):
+        value_outside_bounds = wrap(value_outside_bounds)
+
+        
     if name not in OperationRegistry:
         OperationRegistry[name] = []
+        globals()[name] = lambda *args: DoOperation(name, args)
+
+    if returntype==Solid:
+        construction_funcs = Obj(bounds=bounds, sample_cost_fn=sample_cost_fn_fn, requires_valid_sdf=requires_valid_sdf, outputs_valid_sdf=outputs_valid_sdf, solid_outside_bounds=solid_outside_bounds)
+    else:
+        construction_funcs = Obj(bounds=bounds, sample_cost_fn=sample_cost_fn_fn, requires_valid_sdf=requires_valid_sdf, value_outside_bounds=value_outside_bounds)
+
+    OperationRegistry[name].append( ((lambda args: GetObject(returntype, name, args, construction_funcs)), argtypes) )
+
+#AddOperation("Discretize", (ObjType, True), [(ObjType, False)])
+
+def Translate(obj, vec):
+    return Transform(obj, Transformation(Mat2x2(1,0,0,1),vec))
+
+def Scale(obj, vec):
+    return Transform(obj, Transformation(Mat2x2(vec.x,0,0,vec.y),Vec2(0,0)))
+
+def Rotate(obj, ang):
+    return Transform(obj, Transformation(Mat2x2(math.cos(math.radians(ang)),math.sin(math.radians(ang)),-math.sin(math.radians(ang)),math.cos(math.radians(ang))),Vec2(0,0)))
+
+#makes functions that can use arbitrary number of args
+for expand2 in ("Union","Intersect","Add","Multiply","Max","Min"):
+    def temp2(expand):
         def temp(*args):
-            return DoOperation(name, args)
-        globals()[name] = temp
+            itm = args[0]
+            for i in range(1,len(args)):
+                itm = globals()[expand+"2"](itm, args[i])
+            return itm
+        globals()[expand] = temp
+    temp2(expand2) #fixes dumb scope stuff
 
-    OperationRegistry[name].append( (translate_function, argtypes) )
+AddOperation("Transform", Solid, [Solid, Transformation], outputs_valid_sdf=False) #todo keep sdf validity if transformation is square
+AddOperation("Transform", Field, [Field, Transformation])
 
-#works for either solid or field
-#todo: optimize multiple translate/transform in sequence
+AddOperation("Circle", Solid, [], Bounds(-1,-1,1,1))
+AddOperation("Square", Solid, [], Bounds(-1,-1,1,1))
+AddOperation("Empty", Solid, [], Bounds(0,0,0,0))
 
-for ObjType in (Solid, Field):
-    #AddOperation("Discretize", (ObjType, True), [(ObjType, False)])
-    AddOperation("Transform", ObjType, [ObjType, Transformation], outputs_valid_sdf=False) #todo keep sdf validity if transformation is square
-    AddOperation("Translate", ObjType, [ObjType, Vec2], translate_function=lambda args: Transform(args[0], Transformation(Mat2x2(1,0,0,1),args[1])) )
-    AddOperation("Scale", ObjType, [ObjType, Vec2], translate_function=lambda args: Transform(args[0], Transformation(Mat2x2(args[1].x,0,0,args[1].y),Vec2(0,0))) )
-    AddOperation("Rotate", ObjType, [ObjType, float], translate_function=lambda args: Transform(args[0], Transformation(Mat2x2(math.cos(math.radians(args[1])),math.sin(math.radians(args[1])),-math.sin(math.radians(args[1])),math.cos(math.radians(args[1]))),Vec2(0,0))) )
+AddOperation("Union2", Solid, [Solid, Solid])
+AddOperation("Intersect2", Solid, [Solid, Solid])
 
-for primitive in ["Empty","Circle","Square"]:
-    AddOperation(primitive, Solid, [])
+AddOperation("Subtract", Solid, [Solid, Solid])
 
-for setoperation in ["Union","Intersect","Subtract"]:
-    AddOperation(setoperation, Solid, [Solid, Solid])
+AddOperation("Invert", Solid, [Solid])
 
 AddOperation("ExpandSurface", Solid, [Solid, Field, float], outputs_valid_sdf=False, requires_valid_sdf=True)
 
@@ -275,8 +304,12 @@ AddOperation("SolidToField", Field, [Solid])
 
 AddOperation("BlurField", Field, [Field, float])
 
-for fieldoperation in ["Add", "Subtract", "Multiply", "Max", "Min"]:
-    AddOperation(fieldoperation, Field, [Field, Field])
+AddOperation("Add2", Field, [Field, Field])
+AddOperation("Multiply2", Field, [Field, Field])
+AddOperation("Max2", Field, [Field, Field])
+AddOperation("Min2", Field, [Field, Field])
+
+AddOperation("Subtract", Field, [Field, Field])
 
 AddOperation("Invert", Field, [Field])
 
