@@ -81,6 +81,13 @@ class Mat2x2:
                         self.xx*mat.xy + self.xy*mat.yy,
                         self.yx*mat.xy + self.yy*mat.yy)
 
+    #if the matrix keeps proportions, it can still rotate or uniform scale and be square
+    def is_square(self):
+        tx = self.mul_vec(Vec2(1,0))
+        ty = self.mul_vec(Vec2(0,1))
+        #ty.magnitude() should not be zero or it is a degenerate matrix
+        return abs((tx.magnitude()/ty.magnitude())-1.0) < 0.0001 and abs(tx.normalized().dot(ty.normalized())) < 0.0001
+
     #how much the matrix "blows up" the content in the strongest direction
     def scale_factor(self):
         #do svd https://scicomp.stackexchange.com/questions/8899/robust-algorithm-for-2-times-2-svd
@@ -171,10 +178,10 @@ class Node:
             n._clear_sample_cost()
 
     def _compute_sample_cost(self):
-        if self.sample_cost is not None:
+        if self.sample_cost is None:
             for n in self.input_nodes:
                 n._compute_sample_cost()
-            self.sample_cost = self.sample_cost_fn()
+            self.sample_cost = self.sample_cost_fn(self)
 
     def DetourOutput(self, after):
         assert(self in after.args and self in after.input_nodes)
@@ -256,13 +263,14 @@ class Obj(object):
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
-sample_cost_sum_inputs_plus_one = (lambda args: ( lambda node: 1+sum([n.sample_cost for n in node.input_nodes]) ) )
+sample_cost_sum_inputs_plus_one = ( lambda node: 1+sum([n.sample_cost for n in node.input_nodes]) )
+sample_cost_sum_inputs_plus_one_wrapper = (lambda args: sample_cost_sum_inputs_plus_one)
 
 def AddOperation(name, returntype, argtypes, bounds,
                 requires_valid_sdf=None,
                 outputs_valid_sdf=None, solid_outside_bounds=None,
                 value_range=None, value_outside_bounds=None,
-                sample_cost_fn_fn=sample_cost_sum_inputs_plus_one):
+                sample_cost_fn_fn=sample_cost_sum_inputs_plus_one_wrapper):
 
     assert(type(name) == str)
     assert(returntype in (Solid, Field))
@@ -337,8 +345,8 @@ for expand2 in ("Union","Intersect","Add","Multiply","Max","Min"):
 AddOperation("Transform", Solid, [Solid, Transformation],
     bounds=lambda a: a[0].bounds.transformed(a[1]),
     requires_valid_sdf=False,
-    outputs_valid_sdf=False,
-    solid_outside_bounds=lambda a: a[0].solid_outside_bounds) #todo keep sdf validity if transformation is square
+    outputs_valid_sdf=lambda a: a[1].matrix.is_square(),
+    solid_outside_bounds=lambda a: a[0].solid_outside_bounds)
 
 AddOperation("Transform", Field, [Field, Transformation],
     bounds=lambda a: a[0].bounds.transformed(a[1]),
@@ -408,11 +416,25 @@ AddOperation("EnsureValidSDFForOutput", Solid, [Solid],
     outputs_valid_sdf=True,
     solid_outside_bounds=lambda a: a[0].solid_outside_bounds)
 
-AddOperation("RepairSDF", Solid, [Solid], 
+AddOperation("Discretize", Solid, [Solid], 
+    bounds=lambda a: a[0].bounds,
+    requires_valid_sdf=False,
+    outputs_valid_sdf=IF_INPUTS_VALID,
+    solid_outside_bounds=lambda a: a[0].solid_outside_bounds,
+    sample_cost_fn_fn=lambda a: lambda n: 1)
+
+AddOperation("Discretize", Field, [Field], 
+    bounds=lambda a: a[0].bounds,
+    value_range=lambda a: a[0].value_range,
+    value_outside_bounds=lambda a: a[0].value_outside_bounds,
+    sample_cost_fn_fn=lambda a: lambda n: 1)
+
+AddOperation("DiscretizeAndRepairSDF", Solid, [Solid], 
     bounds=lambda a: a[0].bounds,
     requires_valid_sdf=False,
     outputs_valid_sdf=True,
-    solid_outside_bounds=lambda a: a[0].solid_outside_bounds)
+    solid_outside_bounds=lambda a: a[0].solid_outside_bounds,
+    sample_cost_fn_fn=lambda a: lambda n: 1)
 
 #while iterating you can change the outputs of the visiting node and any unvisited nodes, but not anything thats been visited already
 def creation_order(graph_top):
@@ -428,9 +450,7 @@ def creation_order(graph_top):
             if outputs_visited[inp]>=len(inp.output_nodes):
                 assert(outputs_visited[inp]==len(inp.output_nodes))
                 used_inputs.append(inp)
-
         yield (next, used_inputs)
-
         for out in next.output_nodes:
             if out not in inputs_visited:
                 inputs_visited[out] = 0
@@ -521,11 +541,35 @@ def Output(final, resolution=100):
         for n in path:
             n.sdf_flow_capacity-=limit
 
-    #input_uncertain_sdf_nodes and other sdf stuff is no longer valid or needed
     for fixme in sdf_cut:
-        fixed = RepairSDF(fixme)
+        fixed = DiscretizeAndRepairSDF(fixme)
         fixed.resolution = fixme.resolution
         fixme.DetourOutput(fixed)
+
+    #input_uncertain_sdf_nodes and other sdf stuff is no longer valid or needed
+
+    #insert discretize when sample cost is too high. this could be made more efficient
+    while True:
+        #go up the tree updating sample cost
+        final.compute_sample_costs()
+        for n,dl in creation_order(graph_top):
+            #TODO: support other sample cost functions than sample_cost_sum_inputs_plus_one?
+            #TODO: change algorithm, use a cut or something? use resolution/bounding box?
+            #this just adds discretization when any node sample_cost crosses a threshold (the +10 is arbitrary)
+            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes)+10):
+                highest = None
+                for i in n.input_nodes:
+                    if highest is None or i.sample_cost>highest.sample_cost:
+                        highest = i
+                disc = Discretize(highest)
+                disc.resolution = highest.resolution
+                highest.DetourOutput(disc)
+                break
+        else:
+            break
+
+
+
 
     for n,delete in creation_order(graph_top):
         bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
