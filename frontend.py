@@ -27,6 +27,9 @@ class Bounds:
     def intersect(self, other):
         return Bounds(Vec2.vmax(self.lo,other.lo),Vec2.vmin(self.hi,other.hi))
 
+    def samples(self, resolution):
+        return math.ceil((self.hi.x-self.lo.x)*resolution)*math.ceil((self.hi.y-self.lo.y)*resolution)
+
 class Vec2:
     def __init__(self, x, y):
         self.x=float(x)
@@ -54,7 +57,7 @@ class Vec2:
         return self.mul(1.0/self.magnitude())
 
     def __repr__(self):
-        return "(%r, %r)" % (self.x, self.y)
+        return "(%.2f, %.2f)" % (self.x, self.y)
 
     def __eq__(self, other):
         return isinstance(other, Vec2) and self.__repr__()==other.__repr__()
@@ -91,7 +94,7 @@ class Mat2x2:
         return max(Q+R, abs(Q-R))
 
     def __repr__(self):
-        return "(%r, %r, %r, %r)" % (self.xx, self.yx, self.xy, self.yy)
+        return "(%.2f, %.2f, %.2f, %.2f)" % (self.xx, self.yx, self.xy, self.yy)
     def __eq__(self, other):
         return isinstance(other, Mat2x2) and self.__repr__()==other.__repr__()
     def __hash__(self):
@@ -130,16 +133,16 @@ class Node:
         self.fn = fn
         self.args = args
         self.input_nodes = []
-        self.input_uncertain_solids = []
+        self.input_uncertain_sdf_solids = []
         for a in args:
             if type(a) in (Solid, Field):
                 self.input_nodes.append(a)
                 if type(a)==Solid and (a.outputs_valid_sdf is not True):
-                    self.input_uncertain_solids.append(a)
+                    self.input_uncertain_sdf_solids.append(a)
 
         self.requires_valid_sdf = requires_valid_sdf
 
-        if outputs_valid_sdf==IF_INPUTS_VALID and (requires_valid_sdf or len(self.input_uncertain_solids)==0):
+        if outputs_valid_sdf==IF_INPUTS_VALID and (requires_valid_sdf or len(self.input_uncertain_sdf_solids)==0):
             outputs_valid_sdf = True
 
         self.outputs_valid_sdf = outputs_valid_sdf
@@ -150,9 +153,37 @@ class Node:
         self.resolution = 0
         self.bounds = bounds
 
+        self.sample_cost = None
+        self.sample_cost_fn = sample_cost_fn
+
+        self.sdf_flow_capacity = None
+
     def __repr__(self):
         return self.id
 
+    def compute_sample_costs(self):
+        self._clear_sample_cost()
+        self._compute_sample_cost()
+
+    def _clear_sample_cost(self):
+        self.sample_cost = None
+        for n in self.input_nodes:
+            n._clear_sample_cost()
+
+    def _compute_sample_cost(self):
+        if self.sample_cost is not None:
+            for n in self.input_nodes:
+                n._compute_sample_cost()
+            self.sample_cost = self.sample_cost_fn()
+
+    def DetourOutput(self, after):
+        assert(self in after.args and self in after.input_nodes)
+        after.output_nodes = self.output_nodes
+        self.output_nodes = [after]
+        for out in after.output_nodes:
+            assert(self in out.args and self in out.input_nodes)
+            out.args = tuple(after if a==self else a for a in out.args)
+            out.input_nodes = [after if a==self else a for a in out.input_nodes]
 
 class Solid(Node):
     prefix = "S"
@@ -225,7 +256,7 @@ class Obj(object):
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
-sample_cost_sum_inputs_plus_one = (lambda args: ( lambda node: 1+sum([n.sample_cost() for n in node.input_nodes]) ) )
+sample_cost_sum_inputs_plus_one = (lambda args: ( lambda node: 1+sum([n.sample_cost for n in node.input_nodes]) ) )
 
 def AddOperation(name, returntype, argtypes, bounds,
                 requires_valid_sdf=None,
@@ -371,20 +402,21 @@ AddOperation("BlurField", Field, [Field, float],
 
 # AddOperation("Invert", Field, [Field])
 
-AddOperation("EnsureValidSDF", Solid, [Solid], 
+AddOperation("EnsureValidSDFForOutput", Solid, [Solid], 
     bounds=lambda a: a[0].bounds,
     requires_valid_sdf=True,
     outputs_valid_sdf=True,
     solid_outside_bounds=lambda a: a[0].solid_outside_bounds)
 
-class SDFGraphNode:
-    def __init__(self, node):
-        self.node = node
-        self.edges = set()
+AddOperation("RepairSDF", Solid, [Solid], 
+    bounds=lambda a: a[0].bounds,
+    requires_valid_sdf=False,
+    outputs_valid_sdf=True,
+    solid_outside_bounds=lambda a: a[0].solid_outside_bounds)
 
 #while iterating you can change the outputs of the visiting node and any unvisited nodes, but not anything thats been visited already
 def creation_order(graph_top):
-    fringe = graph_top
+    fringe = graph_top.copy()
     inputs_visited = {}
     outputs_visited = {}
     while len(fringe)>0:
@@ -409,7 +441,7 @@ def creation_order(graph_top):
 
 #this should only be run one time because it edits the nodes
 def Output(final, resolution=100):
-    final = EnsureValidSDF(final)
+    final = EnsureValidSDFForOutput(final)
     assert type(final)==Solid
     assert not final.solid_outside_bounds
 
@@ -448,51 +480,56 @@ def Output(final, resolution=100):
 
     #creation_order is now valid
 
-    sdf_graph_sink = SDFGraphNode(None)
-    sdf_graph_outs = {}
-    sdf_graph_mids = {}
-    sdf_graph_ins = {}
-    sdf_graph_source = SDFGraphNode(None)
+    invalid_sdf_entries = []
+    sdf_cut = set()
+    for n,dl in creation_order(graph_top):
+        if n.outputs_valid_sdf == False:
+            invalid_sdf_entries.append(n)
 
-    def add_to_sdf_graph(n, to):
-        if n.outputs_valid_sdf == IF_INPUTS_VALID:
-            if n not in sdf_graph_mids:
-                sdf_graph_mids[n] = SDFGraphNode(n)
-            sdf_graph_mids[n].edges.add(to)
-        elif n.outputs_valid_sdf == False:
-            if n not in sdf_graph_ins:
-                sdf_graph_ins[n] = SDFGraphNode(n)
-                sdf_graph_source.edges.add(sdf_graph_ins[n])
-            sdf_graph_ins[n].edges.add(to)
-        else:
-            assert(False)
+    def SearchSDFGraph():
+        for n in invalid_sdf_entries:
+            succ, path = RecurseSDFGraph(n)
+            if succ:
+                return True, path
+        return False, None
 
-    # for n in pruned_order:
-    #     if n.requires_valid_sdf and len(n.input_uncertain_solids)>0:
-    #         sdf_graph_outs[n] = SDFGraphNode(n)
-    #         sdf_graph_outs[n].edges.add(sdf_graph_sink)
-    #         for i in n.input_uncertain_solids:
-    #             add_to_sdf_graph(i, sdf_graph_outs[n])
+    def RecurseSDFGraph(n1):
+        if n1.sdf_flow_capacity is None:
+            n1.sdf_flow_capacity = n1.bounds.samples(n1.resolution)
+        if n1.sdf_flow_capacity<=0:
+            assert(n1.sdf_flow_capacity==0)
+            sdf_cut.add(n1)
+            return False, None
+        for n2 in n1.output_nodes:
+            #found the bottom
+            if n2.requires_valid_sdf:
+                return True, [n1]
+            #if it's T or F ignore it
+            if n2.outputs_valid_sdf==IF_INPUTS_VALID:
+                succ, path = RecurseSDFGraph(n2)
+                if succ:
+                    path.append(n1)
+                    return True, path
+        return False, None
 
-    already = set()
-    def printsdfgraph(sgn):
-        ths = "TOP" if sgn==sdf_graph_source else "BOTTOM" 
-        if sgn.node != None:
-            ths = sgn.node.id
-        st = ths
-        if sgn not in already:
-            st += "("
-            already.add(sgn)
-            for out in sgn.edges:
-                st+=printsdfgraph(out)
-            st += ")"
-        return st
+    while True:
+        succ, path = SearchSDFGraph()
+        if not succ:
+            break
+        limit = min([n.sdf_flow_capacity for n in path])
+        assert(limit>0)
+        for n in path:
+            n.sdf_flow_capacity-=limit
 
-    # print( printsdfgraph(sdf_graph_source) )
+    #input_uncertain_sdf_nodes and other sdf stuff is no longer valid or needed
+    for fixme in sdf_cut:
+        fixed = RepairSDF(fixme)
+        fixed.resolution = fixme.resolution
+        fixme.DetourOutput(fixed)
 
     for n,delete in creation_order(graph_top):
-        bounds = "{%r,%r,%r,%r}" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y)
-        print(n.id + "@" + str(n.resolution) + bounds + " =", n.fn, n.args)
+        bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
+        print(n.id + bounds + " =", n.fn, n.args)
 
         #todo: define internal commands for mutable input/output; reuse buffers when possible
         for d in delete:
