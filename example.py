@@ -46,7 +46,7 @@ def make_thing():
 		thing = Union(thing, leaf)
 	return Subtract(thing, Scale(Circle(),Vec2(0.5,0.5)))
 
-shape = Empty()
+shape = UniformSolid(False)
 
 for n in range(5):
 	scale = 1.0/(n+1)
