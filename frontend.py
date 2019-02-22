@@ -562,8 +562,8 @@ def Output(final, resolution=100):
         for n,dl in creation_order(graph_top):
             #TODO: support other sample cost functions than sample_cost_sum_inputs_plus_one?
             #TODO: change algorithm, use a cut or something? use resolution/bounding box? maybe do greedy on lowest cost to discretize or smallest buffer needed?
-            #this just adds discretization when any node sample_cost crosses a threshold (the +10 is arbitrary)
-            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes) + 10):
+            #this just adds discretization when any node sample_cost crosses a threshold (the +20 is arbitrary)
+            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes) + 20):
                 highest = None
                 for i in n.input_nodes:
                     if highest is None or i.sample_cost>highest.sample_cost:
