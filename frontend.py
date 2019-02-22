@@ -555,6 +555,17 @@ def Output(final, resolution=100):
 
     #input_uncertain_sdf_nodes and other sdf stuff is no longer valid or needed
 
+    #discretize output of any node with more than 1 output (todo use dynamic programming or something to make all this better)
+    while True:
+        for n,dl in creation_order(graph_top):
+            if n.fn not in ("Discretize", "DiscretizeAndRepairSDF") and len(n.output_nodes)>1:
+                disc = Discretize(n)
+                disc.resolution = n.resolution
+                n.DetourOutput(disc)
+                break
+        else:
+            break
+
     #insert discretize when sample cost is too high. this could be made more efficient
     while True:
         #go up the tree updating sample cost
@@ -562,8 +573,8 @@ def Output(final, resolution=100):
         for n,dl in creation_order(graph_top):
             #TODO: support other sample cost functions than sample_cost_sum_inputs_plus_one?
             #TODO: change algorithm, use a cut or something? use resolution/bounding box? maybe do greedy on lowest cost to discretize or smallest buffer needed?
-            #this just adds discretization when any node sample_cost crosses a threshold (the +20 is arbitrary)
-            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes) + 20):
+            #this just adds discretization when any node sample_cost crosses a threshold (the +15 is arbitrary)
+            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes) + 15):
                 highest = None
                 for i in n.input_nodes:
                     if highest is None or i.sample_cost>highest.sample_cost:
