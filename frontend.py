@@ -585,8 +585,8 @@ def Output(final, resolution=100):
         command_list.append({"cmd":"create","id":n.id,
                             "bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y],
                             "resolution":n.resolution,
-                            "function": n.fn,
-                            "args": n.args})
+                            "fn": n.fn,
+                            "args": tuple([a if type(a) not in (Solid, Field) else a.id for a in n.args])})
 
         #TODO: define internal commands for mutable input/output; reuse buffers when possible
         #NOTE: will delete objects low in a tree while the root is in use, so don't actually free them until tree is freed (discretized) (TODO change?)
@@ -594,6 +594,8 @@ def Output(final, resolution=100):
             command_list.append( {"cmd":"delete","id":d.id})
     
     command_list.append( {"cmd":"output","id":final.id})
+
+    print(command_list)
 
     return command_list
 
