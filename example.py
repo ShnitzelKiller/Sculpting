@@ -61,4 +61,4 @@ alsounused = Union(shape, Circle(), make_thing(), Square())
 
 final = ExpandSurface(shape, selection, 0.5)
 
-Output(final)
+command_list = Output(final)

@@ -459,8 +459,15 @@ def creation_order(graph_top):
                 assert(inputs_visited[out]==len(out.input_nodes))
                 fringe.append(out)
 
+
+has_run_output = False
+
 #this should only be run one time because it edits the nodes
 def Output(final, resolution=100):
+    global has_run_output
+    assert not has_run_output
+    has_run_output = True
+
     final = EnsureValidSDFForOutput(final)
     assert type(final)==Solid
     assert not final.solid_outside_bounds
@@ -487,8 +494,8 @@ def Output(final, resolution=100):
     resolutions_measured = {}
     while len(fringe)>0:
         next = fringe.pop(0)
-        if next.fn=="Transform" and next.args[1].matrix.scale_factor()>1:
-            print(next)
+        #if next.fn=="Transform" and next.args[1].matrix.scale_factor()>1:
+            #print(next)
         input_res = next.resolution*next.args[1].matrix.scale_factor() if next.fn=="Transform" else next.resolution
         for inp in next.input_nodes:
             inp.resolution = max(inp.resolution, input_res)
@@ -554,7 +561,7 @@ def Output(final, resolution=100):
         final.compute_sample_costs()
         for n,dl in creation_order(graph_top):
             #TODO: support other sample cost functions than sample_cost_sum_inputs_plus_one?
-            #TODO: change algorithm, use a cut or something? use resolution/bounding box?
+            #TODO: change algorithm, use a cut or something? use resolution/bounding box? maybe do greedy on lowest cost to discretize or smallest buffer needed?
             #this just adds discretization when any node sample_cost crosses a threshold (the +10 is arbitrary)
             if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes)+10):
                 highest = None
@@ -569,19 +576,27 @@ def Output(final, resolution=100):
             break
 
 
-
+    command_list = []
 
     for n,delete in creation_order(graph_top):
-        bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
-        print(n.id + bounds + " =", n.fn, n.args)
+        #bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
+        #print(n.id + bounds + " =", n.fn, n.args)
 
-        #todo: define internal commands for mutable input/output; reuse buffers when possible
+        command_list.append({"cmd":"create","id":n.id,
+                            "bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y],
+                            "resolution":n.resolution,
+                            "function": n.fn,
+                            "args": n.args})
+
+        #TODO: define internal commands for mutable input/output; reuse buffers when possible
+        #NOTE: will delete objects low in a tree while the root is in use, so don't actually free them until tree is freed (discretized) (TODO change?)
         for d in delete:
-            print("del "+d.id)
+            command_list.append( {"cmd":"delete","id":d.id})
     
-    print("Output "+final.id)
+    command_list.append( {"cmd":"output","id":final.id})
 
-    print("Exiting")
-    sys.exit()
+    return command_list
+
+
 
 
