@@ -410,7 +410,7 @@ AddOperation("BlurField", Field, [Field, float],
 
 # AddOperation("Invert", Field, [Field])
 
-AddOperation("EnsureValidSDFForOutput", Solid, [Solid], 
+AddOperation("OutputNode", Solid, [Solid], 
     bounds=lambda a: a[0].bounds,
     requires_valid_sdf=True,
     outputs_valid_sdf=True,
@@ -468,9 +468,9 @@ def Output(final, resolution=100):
     assert not has_run_output
     has_run_output = True
 
-    final = EnsureValidSDFForOutput(final)
     assert type(final)==Solid
     assert not final.solid_outside_bounds
+    final = OutputNode(final)
 
     graph_top = []
 
@@ -563,7 +563,7 @@ def Output(final, resolution=100):
             #TODO: support other sample cost functions than sample_cost_sum_inputs_plus_one?
             #TODO: change algorithm, use a cut or something? use resolution/bounding box? maybe do greedy on lowest cost to discretize or smallest buffer needed?
             #this just adds discretization when any node sample_cost crosses a threshold (the +10 is arbitrary)
-            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes)+10):
+            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes) + 10):
                 highest = None
                 for i in n.input_nodes:
                     if highest is None or i.sample_cost>highest.sample_cost:
@@ -581,6 +581,9 @@ def Output(final, resolution=100):
     for n,delete in creation_order(graph_top):
         #bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
         #print(n.id + bounds + " =", n.fn, n.args)
+        if n.fn == "OutputNode":
+            command_list.append( {"cmd":"output","id":n.args[0].id})
+            return command_list
 
         cmd = {"cmd":"create",
                 "type":"solid" if type(n) == Solid else "field",
@@ -603,11 +606,7 @@ def Output(final, resolution=100):
         for d in delete:
             command_list.append( {"cmd":"delete","id":d.id})
     
-    command_list.append( {"cmd":"output","id":final.id})
-
-    #print(command_list)
-
-    return command_list
+    assert False, "didn't find end of list!"
 
 
 
