@@ -5,6 +5,7 @@ struct Transform{T} <: CSG{T}
     x :: T
     y :: T
     matrix :: Matrix{T}
+    Transform{T}(child::CSG{T}, x::Real, y::Real, m::Matrix) where {T} = new(child, x, y, m^-1)
 end
 function rotmatrix(r::Real)
     c = cos(r)
@@ -12,7 +13,6 @@ function rotmatrix(r::Real)
     return [c s; -s c]
 end
 Transform(child::CSG{T}, x::Real, y::Real, r::Real=0.0) where {T} = Transform{T}(child, x, y, rotmatrix(r))
-Transform(child::CSG{T}, x::Real, y::Real, m::Matrix) where {T} = Transform{T}(child, x, y, m)
 
 
 struct Circle{T} <: CSG{T}

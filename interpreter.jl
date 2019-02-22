@@ -17,7 +17,12 @@ function execute(cmds)
             if cmd["fn"] == "Transform"
                 inputShape = namespace[cmd["args"][1]]
                 if isa(inputShape, CSG)
-                    namespace[cmd["id"]] = Transform(inputShape, 0.0, 0.0, 0.0)
+                    trans = cmd["args"][2]
+                    mat = trans[:matrix]
+                    offset = trans[:translation]
+                    matrix = [mat[:xx] mat[:xy]; mat[:yx] mat[:yy]]
+                    print("transformation matrix: $matrix")
+                    namespace[cmd["id"]] = Transform{Float64}(inputShape, offset[:x], offset[:y], matrix)
                 else
                     error("Transform not implemented for $(typeof(inputShape))")
                 end
@@ -96,5 +101,7 @@ function execute(cmds)
             error("unrecognized command type")
             exit()
         end
+        println()
+
     end
 end
