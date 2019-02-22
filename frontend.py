@@ -593,7 +593,7 @@ def Output(final, resolution=100):
         #bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
         #print(n.id + bounds + " =", n.fn, n.args)
         if n.fn == "OutputNode":
-            command_list.append( {"cmd":"output","id":n.args[0].id})
+            command_list.append({"cmd":"output","id":n.args[0].id,"bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y],"resolution":n.resolution})
             return command_list
 
         cmd = {"cmd":"create",
