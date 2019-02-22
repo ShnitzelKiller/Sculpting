@@ -4,9 +4,16 @@ struct Transform{T} <: CSG{T}
     child :: CSG
     x :: T
     y :: T
-    rotation :: T
+    matrix :: Matrix{T}
 end
-Transform(child::CSG{T}, x::Real, y::Real, r::Real=0.0) where {T} = Transform{T}(child, x, y, r)
+function rotmatrix(r::Real)
+    c = cos(trans.rotation)
+    s = sin(trans.rotation)
+    return = [c s; -s c]
+end
+Transform(child::CSG{T}, x::Real, y::Real, r::Real=0.0) where {T} = Transform{T}(child, x, y, rotmatrix(r))
+Transform(child::CSG{T}, x::Real, y::Real, m::Matrix) where {T} = Transform{T}(child, x, y, m)
+
 
 struct Circle{T} <: CSG{T}
     radius :: T
@@ -35,16 +42,18 @@ struct Negate{T} <: CSG{T}
     child :: CSG{T}
 end
 
+
 import Base.getindex
 function getindex(trans::Transform, posx::Real, posy::Real)
     c = cos(trans.rotation)
     s = sin(trans.rotation)
     posx, posy = (posx-trans.x, posy-trans.y)
-    newposx, newposy = (c * posx + s * posy,
-                       -s * posx + c * posy)
+    newposx, newposy = trans.m * [posx, posy]
+    #newposx, newposy = (c * posx + s * posy,
+    #                   -s * posx + c * posy)
     return trans.child[newposx, newposy]
 end
-getindex(csg::T, posx::Real, posy::Real) where {T <: CSG} = error("getindex not implemented for $(typeof(csg))")
+getindex(csg::T, posx::Real, posy::Real) where {T <: CSG} = error("getindex not implemented for $T")
 #signed distance functions
 getindex(csg::Circle, posx::Real, posy::Real) = sqrt(posx*posx+posy*posy) - csg.radius
 function getindex(csg::Square, pos::Vararg{Real, 2})

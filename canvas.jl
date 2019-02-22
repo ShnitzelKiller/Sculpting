@@ -2,18 +2,24 @@ include("CSG.jl")
 include("fast_marching.jl")
 include("mathutil.jl")
 
+using GridInterpolations
+
 struct Canvas{T <: AbstractFloat}
     spacing::T
     dims::Vector{T}
+    offset::Vector{T}
     maxdist::T
     grid::Array{T, 2}
     normals::Array{T, 3}
-    function Canvas{T}(height::Real, width::Real, spacing::Real, maxdist::Real) where {T <: AbstractFloat}
-        dims = [height, width]
-        resolution = Int.(ceil.(dims./spacing))
-        grid = fill(maxdist, resolution...)
-        normals = fill(NaN, 2, resolution...)
-        new{T}(spacing, dims, maxdist, grid, normals)
+    interpGrid::RectangleGrid{2}
+    function Canvas{T}(xlow::Real, ylow::Real, xhigh::Real, yhigh::Real, resolution::Real, maxdist::Real) where {T <: AbstractFloat}
+        dims = [yhigh - ylow, xhigh - xlow]
+        gridSize = Int.(ceil.(dims .* resolution))
+        yhigh, xhigh = [ylow, xlow] + (gridSize[2]-1)/resolution #correct positions
+        grid = fill(maxdist, gridSize...)
+        normals = fill(NaN, 2, gridSize...)
+        interpGrid = RectangleGrid(range(ylow, stop=yhigh, length=gridSize[1]), range(xlow, stop=xhigh, length=gridSize[2]))
+        new{T}(1/resolution, [yhigh-ylow, xhigh-xlow], [ylow, xlow], maxdist, grid, normals, interpGrid)
     end
 end
 Canvas(height::Real, width::Real, spacing::Real, maxdist::Real) = Canvas{Float64}(height, width, spacing, maxdist)
@@ -36,7 +42,7 @@ end
 
 function draw!(canvas::Canvas, shape::CSG; subtract::Bool=false, smoothness::Real=0)
     R = CartesianIndices(canvas.grid)
-    t(coord) = (coord[1]*canvas.spacing, coord[2]*canvas.spacing)
+    t(coord) = (coord[2]*canvas.spacing + canvas.offset[2], coord[1]*canvas.spacing + canvas.offset[1])
     if smoothness <= 0
         if subtract
             for I in R
@@ -80,4 +86,13 @@ function clear!(canvas::Canvas)
     canvas.grid .= canvas.maxdist
     canvas.normals .= NaN
     return canvas
+end
+
+##canvas based CSG definition
+
+struct FromCanvas{T} <: CSG{T}
+    canvas :: Canvas{T}
+end
+function getindex(csg::FromCanvas{T}, posx::Real, posy::Real) where {T}
+    return interpolate(csg.canvas.interpGrid, csg.canvas.grid, [posy, posx])
 end
