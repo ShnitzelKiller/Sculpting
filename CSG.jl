@@ -7,9 +7,9 @@ struct Transform{T} <: CSG{T}
     matrix :: Matrix{T}
 end
 function rotmatrix(r::Real)
-    c = cos(trans.rotation)
-    s = sin(trans.rotation)
-    return = [c s; -s c]
+    c = cos(r)
+    s = sin(r)
+    return [c s; -s c]
 end
 Transform(child::CSG{T}, x::Real, y::Real, r::Real=0.0) where {T} = Transform{T}(child, x, y, rotmatrix(r))
 Transform(child::CSG{T}, x::Real, y::Real, m::Matrix) where {T} = Transform{T}(child, x, y, m)
@@ -41,14 +41,15 @@ end
 struct Negate{T} <: CSG{T}
     child :: CSG{T}
 end
+struct UniformSolid{T} <: CSG{T}
+    filled :: Bool
+end
 
 
 import Base.getindex
 function getindex(trans::Transform, posx::Real, posy::Real)
-    c = cos(trans.rotation)
-    s = sin(trans.rotation)
     posx, posy = (posx-trans.x, posy-trans.y)
-    newposx, newposy = trans.m * [posx, posy]
+    newposx, newposy = trans.matrix * [posx, posy]
     #newposx, newposy = (c * posx + s * posy,
     #                   -s * posx + c * posy)
     return trans.child[newposx, newposy]
@@ -66,3 +67,4 @@ getindex(csg::SoftIntersect, pos::Vararg{Real, 2}) = csg.smoothness*log(sum(exp(
 getindex(csg::Union, pos::Vararg{Real, 2}) = minimum(child[pos...] for child in csg.children)
 getindex(csg::SoftUnion, pos::Vararg{Real, 2}) = -csg.smoothness*log(sum(exp(-child[pos...]/csg.smoothness) for child in csg.children))
 getindex(csg::Negate, pos::Vararg{Real, 2}) = -csg.child[pos...]
+getindex(csg::UniformSolid{T}, pos::Vararg{Real, 2}) where {T} = csg.filled ? typemin(T) : typemax(T)

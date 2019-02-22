@@ -1,8 +1,10 @@
 include("CSG.jl")
 include("fast_marching.jl")
 include("mathutil.jl")
+include("selectors.jl")
 
 using GridInterpolations
+
 
 struct Canvas{T <: AbstractFloat}
     spacing::T
@@ -15,7 +17,7 @@ struct Canvas{T <: AbstractFloat}
     function Canvas{T}(xlow::Real, ylow::Real, xhigh::Real, yhigh::Real, resolution::Real, maxdist::Real) where {T <: AbstractFloat}
         dims = [yhigh - ylow, xhigh - xlow]
         gridSize = Int.(ceil.(dims .* resolution))
-        yhigh, xhigh = [ylow, xlow] + (gridSize[2]-1)/resolution #correct positions
+        yhigh, xhigh = [ylow, xlow] + (gridSize .- 1)/resolution #correct positions
         grid = fill(maxdist, gridSize...)
         normals = fill(NaN, 2, gridSize...)
         interpGrid = RectangleGrid(range(ylow, stop=yhigh, length=gridSize[1]), range(xlow, stop=xhigh, length=gridSize[2]))
@@ -64,13 +66,12 @@ function draw!(canvas::Canvas, shape::CSG; subtract::Bool=false, smoothness::Rea
             end
         end
     end
-    update!(canvas)
     return canvas
 end
 
 function displace!(canvas::Canvas, dist::Real)
     canvas.grid .-= dist
-    update!(canvas)
+    #update!(canvas)
     return canvas
 end
 
@@ -78,7 +79,16 @@ function displace!(canvas::Canvas, dist::Real, selector)
     for I in CartesianIndices(canvas.grid)
         canvas.grid[I] -= dist * selector(canvas.normals[1,I], canvas.normals[2,I])
     end
-    update!(canvas)
+    #update!(canvas)
+    return canvas
+end
+
+function displace!(canvas::Canvas, dist::Real, selector::Field)
+    t(coord) = (coord[2]*canvas.spacing + canvas.offset[2], coord[1]*canvas.spacing + canvas.offset[1])
+    for I in CartesianIndices(canvas.grid)
+        canvas.grid[I] -= dist * selector[t(I)...]
+    end
+    #update!(canvas)
     return canvas
 end
 
