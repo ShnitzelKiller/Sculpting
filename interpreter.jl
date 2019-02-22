@@ -2,6 +2,7 @@ include("canvas.jl")
 
 #TODO: Blur fields
 #out of bounds values
+#Fix how expandSurface handles canvases (modifying them in place currently) once we know how the IR will guarantee types
 
 #put maxdist into frontend
 
@@ -78,6 +79,7 @@ function execute(cmds)
                 fac = cmd["args"][3]
                 if isa(solid, FromCanvas)
                     displace!(solid.canvas, fac, field)
+                    namespace[cmd["id"]] = solid
                 else
                     xlow, ylow, xhigh, yhigh = cmd["bbox"]
                     canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, cmd["resolution"], Inf)
