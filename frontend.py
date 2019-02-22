@@ -582,11 +582,21 @@ def Output(final, resolution=100):
         #bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
         #print(n.id + bounds + " =", n.fn, n.args)
 
-        command_list.append({"cmd":"create","id":n.id,
-                            "bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y],
-                            "resolution":n.resolution,
-                            "fn": n.fn,
-                            "args": tuple([a if type(a) not in (Solid, Field) else a.id for a in n.args])})
+        cmd = {"cmd":"create",
+                "type":"solid" if type(n) == Solid else "field",
+                "id":n.id,
+                "bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y],
+                "resolution":n.resolution,
+                "fn": n.fn,
+                "args": tuple([a if type(a) not in (Solid, Field) else a.id for a in n.args])}
+
+        if type(n) == Solid:
+            cmd["oob_solid"] = n.solid_outside_bounds
+
+        if type(n) == Field:
+            cmd["oob_value"] = n.value_outside_bounds
+
+        command_list.append(cmd)
 
         #TODO: define internal commands for mutable input/output; reuse buffers when possible
         #NOTE: will delete objects low in a tree while the root is in use, so don't actually free them until tree is freed (discretized) (TODO change?)
@@ -595,7 +605,7 @@ def Output(final, resolution=100):
     
     command_list.append( {"cmd":"output","id":final.id})
 
-    print(command_list)
+    #print(command_list)
 
     return command_list
 
