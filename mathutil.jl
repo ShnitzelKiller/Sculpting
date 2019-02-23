@@ -1,3 +1,24 @@
+function interpolate(mat::Matrix{T}, posy::T, posx::T) where {T}
+    h, w = size(mat)
+    if posx >= w-1 || posx < 0 || posy >= h-1 || posy < 0
+        return typemax(T)
+    else
+        x0 = Int(floor(posx))+1
+        y0 = Int(floor(posy))+1
+        x1 = x0 + 1
+        y1 = y0 + 1
+        xfac = posx - (x0-1)
+        yfac = posy - (y0-1)
+        v00 = mat[y0,x0]
+        v01 = mat[y0,x1]
+        v10 = mat[y1,x0]
+        v11 = mat[y1,x1]
+        xavg0 = (1-xfac)*v00 + xfac*v01
+        xavg1 = (1-xfac)*v10 + xfac*v11
+        return (1-yfac)*xavg0 + yfac*xavg1
+    end
+end
+
 function partial!(B, A, dims...)
     R = CartesianIndices(A)
     Ifirst, Ilast = first(R), last(R)

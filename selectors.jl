@@ -1,6 +1,5 @@
 include("typedefs.jl")
-
-using GridInterpolations
+include("mathutil.jl")
 
 function selectnorm(angle, p)
     c, s = cos(angle), sin(angle)
@@ -21,7 +20,6 @@ struct FromSolid{T, C<:CSG{T}} <: Field{T}
     solid :: C
 end
 struct GridField{T} <: Field{T}
-    interpGrid :: RectangleGrid{2}
     data :: Matrix{T}
     offset :: Vector{T}
     spacing :: T
@@ -30,8 +28,7 @@ struct GridField{T} <: Field{T}
         gridSize = Int.(ceil.(resolution .* dims))
         yhigh, xhigh = [ylow, xlow] + (gridSize[2]-1)/resolution #correct positions
         grid = zeros(gridSize...)
-        interpGrid = RectangleGrid(range(ylow, stop=yhigh, length=gridSize[1]), range(xlow, stop=xhigh, length=gridSize[2]))
-        new{T}(interpGrid, grid, [ylow, xlow], 1/resolution)
+        new{T}(grid, [ylow, xlow], 1/resolution)
     end
 end
 function draw!(gridfield::GridField, f::Field)
@@ -42,4 +39,4 @@ function draw!(gridfield::GridField, f::Field)
     end
 end
 getindex(field::FromSolid{T}, posx::Real, posy::Real) where {T} = convert(T, field.solid[posx, posy] < 0)
-getindex(field::GridField{T}, posx::Real, posy::Real) where {T} = interpolate(field.interpGrid, field.data, [posy, posx])
+getindex(field::GridField{T}, posx::Real, posy::Real) where {T} = interpolate(field.data, (posy-field.offset[1])/field.spacing, (posx-field.offset[2])/field.spacing)

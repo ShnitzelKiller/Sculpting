@@ -2,7 +2,7 @@ using PyCall
 
 ex = pyimport("examples")
 
-cmds = ex[:getCmds1]()
+cmds = ex[:getCmds3]()
 
 include("interpreter.jl")
 

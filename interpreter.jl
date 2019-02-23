@@ -40,7 +40,6 @@ function execute(cmds)
                     mat = trans[:matrix]
                     offset = trans[:translation]
                     matrix = [mat[:xx] mat[:xy]; mat[:yx] mat[:yy]]
-                    print("transformation matrix: $matrix")
                     namespace[cmd["id"]] = Transform{Float64}(inputShape, offset[:x], offset[:y], matrix)
                 else
                     error("Transform not implemented for $(typeof(inputShape))")
