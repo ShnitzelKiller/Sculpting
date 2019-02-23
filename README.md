@@ -2,7 +2,9 @@
 
 
 # Milestone III: Partial interpreter implementation
-The interpreter can be run on the test described in the document by running `julia interpretertest.jl`.
+The interpreter in `interpreter.jl` can be run on the test described in the document by running `julia interpretertest.jl`.
+This processes the input AST in the script `frontend.py` to produce the intermediate representation, which is then interpreted by `interpreter.jl`.
+
 This assumes you have Julia installed, with the packages DataStructures, Plots, Images, and PyCall installed. To install a package, within the Julia command prompt execute:
 ```
 using Pkg
