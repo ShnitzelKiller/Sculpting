@@ -4,7 +4,7 @@ include("mathutil.jl")
 include("selectors.jl")
 
 using GridInterpolations
-
+using ProgressMeter
 
 struct Canvas{T <: AbstractFloat}
     spacing::T
@@ -47,21 +47,21 @@ function draw!(canvas::Canvas, shape::CSG; subtract::Bool=false, smoothness::Rea
     t(coord) = (coord[2]*canvas.spacing + canvas.offset[2], coord[1]*canvas.spacing + canvas.offset[1])
     if smoothness <= 0
         if subtract
-            for I in R
+            @showprogress for I in R
                 canvas.grid[I] = max(canvas.grid[I], -shape[t(I)...])
             end
         else
-            for I in R
+            @showprogress for I in R
                 canvas.grid[I] = min(canvas.grid[I], shape[t(I)...])
             end
         end
     else
         if subtract
-            for I in R
+            @showprogress for I in R
                 canvas.grid[I] = log(exp(canvas.grid[I]/smoothness) + exp(-shape[t(I)...]/smoothness))*smoothness
             end
         else
-            for I in R
+            @showprogress for I in R
                 canvas.grid[I] = -log(exp(-canvas.grid[I]/smoothness) + exp(-shape[t(I)...]/smoothness))*smoothness
             end
         end
@@ -76,7 +76,7 @@ function displace!(canvas::Canvas, dist::Real)
 end
 
 function displace!(canvas::Canvas, dist::Real, selector)
-    for I in CartesianIndices(canvas.grid)
+    @showprogress for I in CartesianIndices(canvas.grid)
         canvas.grid[I] -= dist * selector(canvas.normals[1,I], canvas.normals[2,I])
     end
     #update!(canvas)
@@ -85,7 +85,7 @@ end
 
 function displace!(canvas::Canvas, dist::Real, selector::Field)
     t(coord) = (coord[2]*canvas.spacing + canvas.offset[2], coord[1]*canvas.spacing + canvas.offset[1])
-    for I in CartesianIndices(canvas.grid)
+    @showprogress for I in CartesianIndices(canvas.grid)
         canvas.grid[I] -= dist * selector[t(I)...]
     end
     #update!(canvas)
@@ -104,5 +104,5 @@ struct FromCanvas{T} <: CSG{T}
     canvas :: Canvas{T}
 end
 function getindex(csg::FromCanvas{T}, posx::Real, posy::Real) where {T}
-    return interpolate(csg.canvas.interpGrid, csg.canvas.grid, [posy, posx])
+    return interpolate(csg.canvas.interpGrid, csg.canvas.grid, (posy, posx))
 end

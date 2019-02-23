@@ -11,6 +11,24 @@ include("canvas.jl")
 
 namespace = Dict()
 
+function discretize(shape::CSG, resolution, xlow, ylow, xhigh, yhigh, repair=false)
+    canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, resolution, Inf)
+    println("allocated canvas with resolution $resolution and dims $(canvas.dims)")
+    draw!(canvas, shape)
+    println("populated canvas")
+    if repair
+        update!(canvas)
+        println("corrected SDF")
+    end
+    return canvas
+end
+
+function discretize(field::Field, resolution, xlow, ylow, xhigh, yhigh)
+    field = GridField{Float64}(xlow, ylow, xhigh, yhigh, resolution)
+    draw!(field, shape)
+    return field
+end
+
 function execute(cmds)
     for cmd in cmds
         println(cmd)
@@ -28,44 +46,28 @@ function execute(cmds)
                     error("Transform not implemented for $(typeof(inputShape))")
                 end
             elseif cmd["fn"] == "Circle"
-                namespace[cmd["id"]] = Circle(1.0)
+                namespace[cmd["id"]] = Circle{Float64}(1.0)
             elseif cmd["fn"] == "Square"
-                namespace[cmd["id"]] = Square(1.0)
-            elseif cmd["fn"] == "Union" || cmd["fn"] == "Union2"
-                namespace[cmd["id"]] = Union([namespace[id] for id in cmd["args"]])
-            elseif cmd["fn"] == "Intersect" || cmd["fn"] == "Intersect2"
-                namespace[cmd["id"]] = Intersect([namespace[id] for id in cmd["args"]])
+                namespace[cmd["id"]] = Square{Float64}(1.0)
+            elseif cmd["fn"] == "Union2"
+                left = namespace[cmd["args"][1]]
+                right = namespace[cmd["args"][2]]
+                namespace[cmd["id"]] = Union2{Float64, typeof(left), typeof(right)}(left, right)
             elseif cmd["fn"] == "Invert"
-                namespace[cmd["id"]] = Negate(namespace[cmd["args"][1]])
+                shape = namespace[cmd["args"][1]]
+                namespace[cmd["id"]] = Negate{Float64, typeof(shape)}(shape)
             elseif cmd["fn"] == "Discretize"
                 shape = namespace[cmd["args"][1]]
-                xlow, ylow, xhigh, yhigh = cmd["bbox"]
-                if isa(shape, CSG)
-                    canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, cmd["resolution"], Inf)
-                    draw!(canvas, shape)
-                    namespace[cmd["id"]] = FromCanvas{Float64}(canvas)
-                elseif isa(shape, Field)
-                    field = GridField{Float64}(xlow, ylow, xhigh, yhigh, cmd["resolution"])
-                    draw!(field, shape)
-                    namespace[cmd["id"]] = field
-                else
-                    error("invalid argument to Discretize")
-                end
-            elseif cmd["fn"] == "DiscretizeAndRepairSDF" || cmd["fn"] == "EnsureValidSDFForOutput"
+                discretized = discretize(shape, cmd["resolution"], cmd["bbox"]...)
+                namespace[cmd["id"]] = FromCanvas{Float64}(discretized)
+            elseif cmd["fn"] == "DiscretizeAndRepairSDF"
                 shape = namespace[cmd["args"][1]]
-                xlow, ylow, xhigh, yhigh = cmd["bbox"]
-                if isa(shape, CSG)
-                    canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, cmd["resolution"], Inf)
-                    draw!(canvas, shape)
-                    update!(canvas)
-                    namespace[cmd["id"]] = FromCanvas{Float64}(canvas)
-                else
-                    error("invalid argument to DiscretizeAndRepairSDF")
-                end
+                discretized = discretize(shape, cmd["resolution"], cmd["bbox"]..., true)
+                namespace[cmd["id"]] = FromCanvas{Float64}(discretized)
             elseif cmd["fn"] == "SolidToField"
                 solid = namespace[cmd["args"][1]]
                 if isa(solid, CSG)
-                    field = FromSolid{Float64}(solid)
+                    field = FromSolid{Float64, typeof(solid)}(solid)
                     namespace[cmd["id"]] = field
                 else
                     error("SolidToField called on non-field")
@@ -77,17 +79,8 @@ function execute(cmds)
                 solid = namespace[cmd["args"][1]]
                 field = namespace[cmd["args"][2]]
                 fac = cmd["args"][3]
-                if isa(solid, FromCanvas)
-                    displace!(solid.canvas, fac, field)
-                    namespace[cmd["id"]] = solid
-                else
-                    xlow, ylow, xhigh, yhigh = cmd["bbox"]
-                    canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, cmd["resolution"], Inf)
-                    draw!(canvas, solid)
-                    displace!(canvas, fac, field)
-                    namespace[cmd["id"]] = FromCanvas{Float64}(canvas)
-                    #error("trying to expand non-discretized solid of type $(typeof(solid))")
-                end
+                displaced = Displace{Float64, typeof(solid), typeof(field)}(solid, field, fac)
+                namespace[cmd["id"]] = displaced
             elseif cmd["fn"] == "UniformSolid"
                 solid = UniformSolid{Float64}(cmd["args"][1])
                 namespace[cmd["id"]] = solid
@@ -98,7 +91,14 @@ function execute(cmds)
         elseif cmd["cmd"] == "delete"
             delete!(namespace, cmd["id"])
         elseif cmd["cmd"] == "output"
-            return namespace[cmd["id"]]
+            result = namespace[cmd["id"]]
+            if isa(result, FromCanvas)
+                return result.canvas
+            elseif isa(result, CSG)
+                return discretize(result, cmd["resolution"], cmd["bbox"]..., true)
+            else
+                error("output not a solid")
+            end
         else
             error("unrecognized command type")
             exit()

@@ -1,3 +1,5 @@
+include("typedefs.jl")
+
 using GridInterpolations
 
 function selectnorm(angle, p)
@@ -14,11 +16,9 @@ function selectnorm_twosided(angle, p)
     end
     return f
 end
-abstract type Field{T<:AbstractFloat} end
-getindex(field::T, posx::Real, posy::Real) where {T <: Field} = error("getindex not implemented for $T")
 
-struct FromSolid{T} <: Field{T}
-    solid :: CSG{T}
+struct FromSolid{T, C<:CSG{T}} <: Field{T}
+    solid :: C
 end
 struct GridField{T} <: Field{T}
     interpGrid :: RectangleGrid{2}

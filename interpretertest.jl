@@ -1,8 +1,8 @@
 using PyCall
 
-ex = pyimport("example2")
+ex = pyimport("examples")
 
-cmds = ex[:getCmds]()
+cmds = ex[:getCmds1]()
 
 include("interpreter.jl")
 
