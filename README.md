@@ -1,5 +1,16 @@
 # 2D Sculpting
 
+
+# Milestone III: Partial interpreter implementation
+The interpreter can be run on the test described in the document by running `julia interpretertest.jl`.
+This assumes you have Julia installed, with the packages DataStructures, Plots, Images installed. To install a package, within the Julia command prompt execute:
+```
+using Pkg
+Pkg.add(“PackageName”)
+```
+Then the above script should produce the same image as in the example in the document (albeit rotated since it fit better in the document that way).
+
+
 ## Sculpting prototype
 To see the results of the python implementation, run
 ```
