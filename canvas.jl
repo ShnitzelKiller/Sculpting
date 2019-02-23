@@ -3,8 +3,6 @@ include("fast_marching.jl")
 include("mathutil.jl")
 include("selectors.jl")
 
-using ProgressMeter
-
 struct Canvas{T <: AbstractFloat}
     spacing::T
     dims::Vector{T}
@@ -44,21 +42,21 @@ function draw!(canvas::Canvas, shape::CSG; subtract::Bool=false, smoothness::Rea
     t(coord) = (coord[2]*canvas.spacing + canvas.offset[2], coord[1]*canvas.spacing + canvas.offset[1])
     if smoothness <= 0
         if subtract
-            @showprogress for I in R
+            for I in R
                 canvas.grid[I] = max(canvas.grid[I], -shape[t(I)...])
             end
         else
-            @showprogress for I in R
+            for I in R
                 canvas.grid[I] = min(canvas.grid[I], shape[t(I)...])
             end
         end
     else
         if subtract
-            @showprogress for I in R
+            for I in R
                 canvas.grid[I] = log(exp(canvas.grid[I]/smoothness) + exp(-shape[t(I)...]/smoothness))*smoothness
             end
         else
-            @showprogress for I in R
+            for I in R
                 canvas.grid[I] = -log(exp(-canvas.grid[I]/smoothness) + exp(-shape[t(I)...]/smoothness))*smoothness
             end
         end
@@ -73,7 +71,7 @@ function displace!(canvas::Canvas, dist::Real)
 end
 
 function displace!(canvas::Canvas, dist::Real, selector)
-    @showprogress for I in CartesianIndices(canvas.grid)
+    for I in CartesianIndices(canvas.grid)
         canvas.grid[I] -= dist * selector(canvas.normals[1,I], canvas.normals[2,I])
     end
     #update!(canvas)
@@ -82,7 +80,7 @@ end
 
 function displace!(canvas::Canvas, dist::Real, selector::Field)
     t(coord) = (coord[2]*canvas.spacing + canvas.offset[2], coord[1]*canvas.spacing + canvas.offset[1])
-    @showprogress for I in CartesianIndices(canvas.grid)
+    for I in CartesianIndices(canvas.grid)
         canvas.grid[I] -= dist * selector[t(I)...]
     end
     #update!(canvas)
