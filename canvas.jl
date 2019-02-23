@@ -3,8 +3,28 @@ include("fast_marching.jl")
 include("mathutil.jl")
 include("selectors.jl")
 
-using GridInterpolations
 using ProgressMeter
+
+function interpolate(mat::Matrix{T}, posy::T, posx::T) where {T}
+    h, w = size(mat)
+    if posx >= w-1 || posx < 0 || posy >= h-1 || posy < 0
+        return typemax(T)
+    else
+        x0 = Int(floor(posx))+1
+        y0 = Int(floor(posy))+1
+        x1 = x0 + 1
+        y1 = y0 + 1
+        xfac = posx - (x0-1)
+        yfac = posy - (y0-1)
+        v00 = mat[y0,x0]
+        v01 = mat[y0,x1]
+        v10 = mat[y1,x0]
+        v11 = mat[y1,x1]
+        xavg0 = (1-xfac)*v00 + xfac*v01
+        xavg1 = (1-xfac)*v10 + xfac*v11
+        return (1-yfac)*xavg0 + yfac*xavg1
+    end
+end
 
 struct Canvas{T <: AbstractFloat}
     spacing::T
@@ -13,15 +33,13 @@ struct Canvas{T <: AbstractFloat}
     maxdist::T
     grid::Array{T, 2}
     normals::Array{T, 3}
-    interpGrid::RectangleGrid{2}
     function Canvas{T}(xlow::Real, ylow::Real, xhigh::Real, yhigh::Real, resolution::Real, maxdist::Real) where {T <: AbstractFloat}
         dims = [yhigh - ylow, xhigh - xlow]
         gridSize = Int.(ceil.(dims .* resolution))
         yhigh, xhigh = [ylow, xlow] + (gridSize .- 1)/resolution #correct positions
         grid = fill(maxdist, gridSize...)
         normals = fill(NaN, 2, gridSize...)
-        interpGrid = RectangleGrid(range(ylow, stop=yhigh, length=gridSize[1]), range(xlow, stop=xhigh, length=gridSize[2]))
-        new{T}(1/resolution, [yhigh-ylow, xhigh-xlow], [ylow, xlow], maxdist, grid, normals, interpGrid)
+        new{T}(1/resolution, [yhigh-ylow, xhigh-xlow], [ylow, xlow], maxdist, grid, normals)
     end
 end
 Canvas(height::Real, width::Real, spacing::Real, maxdist::Real) = Canvas{Float64}(height, width, spacing, maxdist)
@@ -104,5 +122,5 @@ struct FromCanvas{T} <: CSG{T}
     canvas :: Canvas{T}
 end
 function getindex(csg::FromCanvas{T}, posx::Real, posy::Real) where {T}
-    return interpolate(csg.canvas.interpGrid, csg.canvas.grid, (posy, posx))
+    return interpolate(csg.canvas.grid, (posy-csg.canvas.offset[1])/csg.canvas.spacing, (posx-csg.canvas.offset[2])/csg.canvas.spacing)
 end
