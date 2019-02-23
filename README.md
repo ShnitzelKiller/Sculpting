@@ -3,7 +3,7 @@
 
 # Milestone III: Partial interpreter implementation
 The interpreter can be run on the test described in the document by running `julia interpretertest.jl`.
-This assumes you have Julia installed, with the packages DataStructures, Plots, Images installed. To install a package, within the Julia command prompt execute:
+This assumes you have Julia installed, with the packages DataStructures, Plots, Images, and PyCall installed. To install a package, within the Julia command prompt execute:
 ```
 using Pkg
 Pkg.add(“PackageName”)
