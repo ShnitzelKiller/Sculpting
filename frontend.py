@@ -135,7 +135,7 @@ IF_INPUTS_VALID = 3
 #valid_if_inputs_valid_fn = lambda a: True if all([x.outputs_valid_sdf for x in a if type(x)==Solid]) else IF_INPUTS_VALID
 
 class Node:
-    def __init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, outputs_valid_sdf=True):
+    def __init__(self, id_, fn, args, bounds, parent_samples_needed_fn, requires_valid_sdf, outputs_valid_sdf=True):
         self.id = id_
         self.fn = fn
         self.args = args
@@ -160,28 +160,25 @@ class Node:
         self.resolution = 0
         self.bounds = bounds
 
-        self.sample_cost = None
-        self.sample_cost_fn = sample_cost_fn
+        self.parent_samples_needed = None
+        self.parent_samples_needed_fn = parent_samples_needed_fn #wait until resolutions are computed for this
 
         self.sdf_flow_capacity = None
+
+        self.discretize = False
+        self.repair_sdf = False
 
     def __repr__(self):
         return self.id
 
-    def compute_sample_costs(self):
-        self._clear_sample_cost()
-        self._compute_sample_cost()
-
-    def _clear_sample_cost(self):
-        self.sample_cost = None
-        for n in self.input_nodes:
-            n._clear_sample_cost()
-
-    def _compute_sample_cost(self):
-        if self.sample_cost is None:
-            for n in self.input_nodes:
-                n._compute_sample_cost()
-            self.sample_cost = self.sample_cost_fn(self)
+    # def compute_parent_samples_needed(self):
+    #     if self.parent_samples_needed is None:
+    #         for n in self.input_nodes:
+    #             n.compute_parent_samples_needed()
+    #         self.parent_samples_needed = self.parent_samples_needed_fn(self)
+            #self.sample_cost = 1
+            #for inp in range(len(self.input_nodes)):
+            #    self.sample_cost += self.parent_samples_needed[inp] * self.input_nodes[inp].sample_cost
 
     def DetourOutput(self, after):
         assert(self in after.args and self in after.input_nodes)
@@ -194,15 +191,15 @@ class Node:
 
 class Solid(Node):
     prefix = "S"
-    def __init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, outputs_valid_sdf, solid_outside_bounds):
-        Node.__init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, outputs_valid_sdf=outputs_valid_sdf)
+    def __init__(self, id_, fn, args, bounds, parent_samples_needed_fn, requires_valid_sdf, outputs_valid_sdf, solid_outside_bounds):
+        Node.__init__(self, id_, fn, args, bounds, parent_samples_needed_fn, requires_valid_sdf, outputs_valid_sdf=outputs_valid_sdf)
         self.solid_outside_bounds = solid_outside_bounds
 
 
 class Field(Node):
     prefix = "F"
-    def __init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf, value_range, value_outside_bounds):
-        Node.__init__(self, id_, fn, args, bounds, sample_cost_fn, requires_valid_sdf)
+    def __init__(self, id_, fn, args, bounds, parent_samples_needed_fn, requires_valid_sdf, value_range, value_outside_bounds):
+        Node.__init__(self, id_, fn, args, bounds, parent_samples_needed_fn, requires_valid_sdf)
         self.value_range = value_range
         self.value_outside_bounds = value_outside_bounds
         assert(value_outside_bounds>=value_range[0] and value_outside_bounds<=value_range[1])
@@ -263,14 +260,11 @@ class Obj(object):
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
-sample_cost_sum_inputs_plus_one = ( lambda node: 1+sum([n.sample_cost for n in node.input_nodes]) )
-sample_cost_sum_inputs_plus_one_wrapper = (lambda args: sample_cost_sum_inputs_plus_one)
-
 def AddOperation(name, returntype, argtypes, bounds,
                 requires_valid_sdf=None,
                 outputs_valid_sdf=None, solid_outside_bounds=None,
                 value_range=None, value_outside_bounds=None,
-                sample_cost_fn_fn=sample_cost_sum_inputs_plus_one_wrapper):
+                parent_samples_needed_fn_fn=None):
 
     assert(type(name) == str)
     assert(returntype in (Solid, Field))
@@ -279,6 +273,10 @@ def AddOperation(name, returntype, argtypes, bounds,
         assert(type(arg) == type)
 
     bounds = check_wrap(bounds, type(bounds)==Bounds)
+
+    if parent_samples_needed_fn_fn==None:
+        parent_samples_needed_fn_fn = lambda a: lambda n: [1 for arg in a if type(arg) in (Solid, Field)]
+    assert(callable(parent_samples_needed_fn_fn))
 
     if Solid in argtypes:
         assert requires_valid_sdf is not None, "Need requires_valid_sdf for Solid inputs"
@@ -297,18 +295,16 @@ def AddOperation(name, returntype, argtypes, bounds,
         assert solid_outside_bounds is None, "Unused for Field output"
         value_range = check_wrap(value_range, type(value_range)==tuple and len(value_range)==2 and type(value_range[0]) in (float,int) and type(value_range[1]) in (float,int))
         value_outside_bounds = check_wrap(value_outside_bounds, type(value_outside_bounds) in (float,int))
-
-    assert(callable(sample_cost_fn_fn))
       
     if name not in OperationRegistry:
         OperationRegistry[name] = []
         globals()[name] = lambda *args: DoOperation(name, args)
 
     if returntype==Solid:
-        construction_funcs = Obj(bounds=bounds, sample_cost_fn=sample_cost_fn_fn, requires_valid_sdf=requires_valid_sdf, 
+        construction_funcs = Obj(bounds=bounds, requires_valid_sdf=requires_valid_sdf, parent_samples_needed_fn=parent_samples_needed_fn_fn,
                                     outputs_valid_sdf=outputs_valid_sdf, solid_outside_bounds=solid_outside_bounds)
     else:
-        construction_funcs = Obj(bounds=bounds, sample_cost_fn=sample_cost_fn_fn, requires_valid_sdf=requires_valid_sdf, 
+        construction_funcs = Obj(bounds=bounds, requires_valid_sdf=requires_valid_sdf, parent_samples_needed_fn=parent_samples_needed_fn_fn,
                                     value_range=value_range, value_outside_bounds=value_outside_bounds)
 
     OperationRegistry[name].append( ((lambda args: GetObject(returntype, name, args, construction_funcs)), argtypes) )
@@ -398,10 +394,20 @@ AddOperation("SolidToField", Field, [Solid],
     value_outside_bounds=lambda a: 1 if a[0].solid_outside_bounds else 0)
 
 #arg is standard deviation, do 3 std
-AddOperation("BlurField", Field, [Field, float],
+AddOperation("BlurFieldX", Field, [Field, float],
     bounds=lambda a: a[0].bounds.expanded(abs(a[1])*3.0),
     value_range=lambda a: a[0].value_range,
-    value_outside_bounds=lambda a: a[0].value_outside_bounds)
+    value_outside_bounds=lambda a: a[0].value_outside_bounds,
+    parent_samples_needed_fn_fn=lambda a: lambda n: [math.ceil(n.resolution*a[1]*6)])
+
+AddOperation("BlurFieldY", Field, [Field, float],
+    bounds=lambda a: a[0].bounds.expanded(abs(a[1])*3.0),
+    value_range=lambda a: a[0].value_range,
+    value_outside_bounds=lambda a: a[0].value_outside_bounds,
+    parent_samples_needed_fn_fn=lambda a: lambda n: [math.ceil(n.resolution*a[1]*6)])
+
+def BlurField(field, std):
+    return BlurFieldY(BlurFieldX(field, std), std)
 
 # AddOperation("Add2", Field, [Field, Field])
 # AddOperation("Multiply2", Field, [Field, Field])
@@ -415,26 +421,6 @@ AddOperation("OutputNode", Solid, [Solid],
     requires_valid_sdf=True,
     outputs_valid_sdf=True,
     solid_outside_bounds=lambda a: a[0].solid_outside_bounds)
-
-AddOperation("Discretize", Solid, [Solid], 
-    bounds=lambda a: a[0].bounds,
-    requires_valid_sdf=False,
-    outputs_valid_sdf=IF_INPUTS_VALID,
-    solid_outside_bounds=lambda a: a[0].solid_outside_bounds,
-    sample_cost_fn_fn=lambda a: lambda n: 1)
-
-AddOperation("Discretize", Field, [Field], 
-    bounds=lambda a: a[0].bounds,
-    value_range=lambda a: a[0].value_range,
-    value_outside_bounds=lambda a: a[0].value_outside_bounds,
-    sample_cost_fn_fn=lambda a: lambda n: 1)
-
-AddOperation("DiscretizeAndRepairSDF", Solid, [Solid], 
-    bounds=lambda a: a[0].bounds,
-    requires_valid_sdf=False,
-    outputs_valid_sdf=True,
-    solid_outside_bounds=lambda a: a[0].solid_outside_bounds,
-    sample_cost_fn_fn=lambda a: lambda n: 1)
 
 #while iterating you can change the outputs of the visiting node and any unvisited nodes, but not anything thats been visited already
 def creation_order(graph_top):
@@ -470,7 +456,7 @@ def Output(final, resolution=100):
 
     assert type(final)==Solid
     assert not final.solid_outside_bounds
-    final = OutputNode(final)
+    output_final = OutputNode(final)
 
     graph_top = []
 
@@ -486,11 +472,11 @@ def Output(final, resolution=100):
         if not has_input and s not in graph_top:
             graph_top.append(s)
 
-    find_outputs(final)
+    find_outputs(output_final)
 
     # traverse upward to figure out the resolution of each node
-    final.resolution = resolution
-    fringe = [final]
+    output_final.resolution = resolution
+    fringe = [output_final]
     resolutions_measured = {}
     while len(fringe)>0:
         next = fringe.pop(0)
@@ -549,58 +535,33 @@ def Output(final, resolution=100):
             n.sdf_flow_capacity-=limit
 
     for fixme in sdf_cut:
-        fixed = DiscretizeAndRepairSDF(fixme)
-        fixed.resolution = fixme.resolution
-        fixme.DetourOutput(fixed)
+        fixme.discretize = True
+        fixme.repair_sdf = True
 
     #input_uncertain_sdf_nodes and other sdf stuff is no longer valid or needed
 
-    #discretize output of any node with more than 1 output (todo use dynamic programming or something to make all this better)
-    while True:
-        for n,dl in creation_order(graph_top):
-            if n.fn not in ("Discretize", "DiscretizeAndRepairSDF") and len(n.output_nodes)>1:
-                disc = Discretize(n)
-                disc.resolution = n.resolution
-                n.DetourOutput(disc)
-                break
-        else:
-            break
+    #discretize output of any node with more than 1 output or is sampled more than once (todo use dynamic programming or something to make this better?)
+    for n,dl in creation_order(graph_top):
+        n.parent_samples_needed = n.parent_samples_needed_fn(n)
 
-    #insert discretize when sample cost is too high. this could be made more efficient
-    while True:
-        #go up the tree updating sample cost
-        final.compute_sample_costs()
-        for n,dl in creation_order(graph_top):
-            #TODO: support other sample cost functions than sample_cost_sum_inputs_plus_one?
-            #TODO: change algorithm, use a cut or something? use resolution/bounding box? maybe do greedy on lowest cost to discretize or smallest buffer needed?
-            #this just adds discretization when any node sample_cost crosses a threshold (the +15 is arbitrary)
-            if n.sample_cost_fn==sample_cost_sum_inputs_plus_one and n.sample_cost>(len(n.input_nodes) + 15):
-                highest = None
-                for i in n.input_nodes:
-                    if highest is None or i.sample_cost>highest.sample_cost:
-                        highest = i
-                disc = Discretize(highest)
-                disc.resolution = highest.resolution
-                highest.DetourOutput(disc)
-                break
-        else:
-            break
+    for n,dl in creation_order(graph_top):
+        if sum(o.parent_samples_needed[o.input_nodes.index(n)] for o in n.output_nodes) > 1:
+            n.discretize = True
 
+    final.discretize=True
 
     command_list = []
 
     for n,delete in creation_order(graph_top):
         #bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
-        #print(n.id + bounds + " =", n.fn, n.args)
+        #print(n.id + bounds + " =", n.fn, n.args))
         if n.fn == "OutputNode":
-            command_list.append({"cmd":"output","id":n.args[0].id,"bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y],"resolution":n.resolution})
+            #print("\n".join([repr(c) for c in command_list]))
             return command_list
 
         cmd = {"cmd":"create",
                 "type":"solid" if type(n) == Solid else "field",
                 "id":n.id,
-                "bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y],
-                "resolution":n.resolution,
                 "fn": n.fn,
                 "args": tuple([a if type(a) not in (Solid, Field) else a.id for a in n.args])}
 
@@ -610,12 +571,16 @@ def Output(final, resolution=100):
         if type(n) == Field:
             cmd["oob_value"] = n.value_outside_bounds
 
+        if n.discretize:
+            cmd["discretize"] = { "bbox":[n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y], "resolution":n.resolution, "repair_sdf":n.repair_sdf }
+
         command_list.append(cmd)
 
         #TODO: define internal commands for mutable input/output; reuse buffers when possible
         #NOTE: will delete objects low in a tree while the root is in use, so don't actually free them until tree is freed (discretized) (TODO change?)
         for d in delete:
-            command_list.append( {"cmd":"delete","id":d.id})
+            if d.discretize:
+                command_list.append( {"cmd":"delete","id":d.id})
     
     assert False, "didn't find end of list!"
 
