@@ -426,23 +426,25 @@ AddOperation("OutputNode", Solid, [Solid],
 def creation_order(graph_top):
     fringe = graph_top.copy()
     inputs_visited = {}
-    outputs_visited = {}
+    future_or_current_users = {}
+    def no_longer_using_inputs(n, gc):
+        for i in n.input_nodes:
+            future_or_current_users[i]-=1
+            if future_or_current_users[i]==0:
+                gc.append(i)
+                no_longer_using_inputs(i, gc)
     while len(fringe)>0:
         next = fringe.pop(0)
-        outputs_visited[next] = 0
-        used_inputs = []
-        for inp in next.input_nodes:
-            outputs_visited[inp] += 1
-            if outputs_visited[inp]>=len(inp.output_nodes):
-                assert(outputs_visited[inp]==len(inp.output_nodes))
-                used_inputs.append(inp)
-        yield (next, used_inputs)
+        future_or_current_users[next] = len(next.output_nodes)
+        gc=[]
+        if next.discretize:
+            no_longer_using_inputs(next, gc)
+        yield (next, gc)
         for out in next.output_nodes:
             if out not in inputs_visited:
                 inputs_visited[out] = 0
             inputs_visited[out] += 1
-            if inputs_visited[out]>=len(out.input_nodes):
-                assert(inputs_visited[out]==len(out.input_nodes))
+            if inputs_visited[out]==len(out.input_nodes):
                 fringe.append(out)
 
 
@@ -555,9 +557,6 @@ def Output(final, resolution=100):
     for n,delete in creation_order(graph_top):
         #bounds = " {%.2f,%.2f,%.2f,%.2f}*%.2f" % (n.bounds.lo.x, n.bounds.lo.y, n.bounds.hi.x, n.bounds.hi.y, n.resolution)
         #print(n.id + bounds + " =", n.fn, n.args))
-        if n.fn == "OutputNode":
-            #print("\n".join([repr(c) for c in command_list]))
-            return command_list
 
         cmd = {"cmd":"create",
                 "type":"solid" if type(n) == Solid else "field",
@@ -576,11 +575,14 @@ def Output(final, resolution=100):
 
         command_list.append(cmd)
 
+        if n==final:
+            cmd["final"]=True
+            #print("\n".join([repr(c) for c in command_list]))
+            return command_list
+
         #TODO: define internal commands for mutable input/output; reuse buffers when possible
-        #NOTE: will delete objects low in a tree while the root is in use, so don't actually free them until tree is freed (discretized) (TODO change?)
-        for d in delete:
-            if d.discretize:
-                command_list.append( {"cmd":"delete","id":d.id})
+        if len(delete)>0:
+            command_list.append({"cmd":"delete","ids":delete})
     
     assert False, "didn't find end of list!"
 
