@@ -1,7 +1,7 @@
 using PyCall
 
 ex = pyimport("examples")
-cmds = ex[:getCmds1]()
+cmds = ex[:getCmds2]()
 include("interpreter.jl")
 result = execute(cmds)
 

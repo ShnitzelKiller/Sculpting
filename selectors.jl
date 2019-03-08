@@ -19,6 +19,9 @@ end
 struct FromSolid{T, C<:CSG{T}} <: Field{T}
     solid :: C
 end
+struct UniformField{T} <: Field{T}
+    val :: T
+end
 struct GridField{T} <: Field{T}
     data :: Matrix{T}
     offset :: Vector{T}
@@ -39,5 +42,6 @@ function draw!(gridfield::GridField, f::Field)
         gridfield.data[I] = f[t(I)...]
     end
 end
+getindex(field::UniformField{T}, posx::Real, posy::Real) where {T} = field.val
 getindex(field::FromSolid{T}, posx::Real, posy::Real) where {T} = convert(T, field.solid[posx, posy] < 0)
 getindex(field::GridField{T}, posx::Real, posy::Real) where {T} = interpolate(field.data, (posy-field.offset[1])/field.spacing, (posx-field.offset[2])/field.spacing, field.oob)

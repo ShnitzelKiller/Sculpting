@@ -74,4 +74,4 @@ getindex(csg::Union2{T}, pos::Vararg{T,2}) where {T} = min(csg.left[pos...], csg
 getindex(csg::SoftUnion{T}, pos::Vararg{T, 2}) where {T} = -csg.smoothness*log(sum(exp(-child[pos...]/csg.smoothness) for child in csg.children))
 getindex(csg::Negate{T}, pos::Vararg{T, 2}) where {T} = -csg.child[pos...]
 getindex(csg::UniformSolid{T}, pos::Vararg{T, 2}) where {T} = csg.filled ? typemin(T) : typemax(T)
-getindex(csg::Displace{T}, pos::Vararg{T, 2}) where {T} = csg.child[pos...] * csg.selection[pos...] * csg.factor
+getindex(csg::Displace{T}, pos::Vararg{T, 2}) where {T} = csg.child[pos...] - csg.selection[pos...] * csg.factor

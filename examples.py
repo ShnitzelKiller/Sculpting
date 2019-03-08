@@ -1,4 +1,5 @@
 from frontend import *
+from numpy import sin, cos
 
 def getCmds1():
 	shape = UniformSolid(False)
@@ -12,33 +13,16 @@ def getCmds1():
 
 	return Output(shape)
 
-
-def make_thing():
-	thing = Circle()
-	for i in range(0,360,45):
-		leaf = Scale(Circle(), Vec2(0.5,0.5))
-		leaf = Translate(leaf, Vec2(0,1))
-		leaf = Rotate(leaf, i)
-		thing = Union(thing, leaf)
-	return Subtract(thing, Scale(Circle(),Vec2(0.5,0.5)))
-
 def getCmds2():
-	shape = UniformSolid(False)
-
-	for n in range(5):
-		scale = 1.0/(n+1)
-		shape = Union(shape, Translate(Scale(make_thing(), Vec2(scale,scale)), Vec2(0, n)))
-
-	selection = Translate(Scale(Square(), Vec2(2, 10)), Vec2(2, 0))
-	selection = SolidToField(selection)
-	blurred = BlurField(selection, 1)
-
-	unused = BlurField(selection, 10)
-	alsounused = Union(shape, Circle(), make_thing(), Square())
-
-	final = ExpandSurface(shape, selection, 0.5)
-
-	return Output(final)
+	shape = Circle()
+	num = 6
+	for i in range(num):
+		ang = i/num * 6.28
+		cog = Scale(Circle(), Vec2(0.4, 0.4))
+		shape = Union(shape, Translate(cog, Vec2(cos(ang), sin(ang))))
+	field = UniformField(1)
+	shape2 = ExpandSurface(shape, field, -0.2)
+	return Output(shape2)
 
 def getCmds3():
 	shape = Circle()

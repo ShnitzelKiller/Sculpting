@@ -40,6 +40,7 @@ function execute(cmds)
                 mat = trans[:matrix]
                 offset = trans[:translation]
                 matrix = [mat[:xx] mat[:xy]; mat[:yx] mat[:yy]]
+                println(matrix)
                 namespace[cmd["id"]] = Transform{Float64}(inputShape, offset[:x], offset[:y], matrix)
             elseif fn == "Circle"
                 namespace[cmd["id"]] = Circle{Float64}(1.0)
@@ -72,12 +73,17 @@ function execute(cmds)
             elseif fn == "UniformSolid"
                 solid = UniformSolid{Float64}(cmd["args"][1])
                 namespace[cmd["id"]] = solid
+            elseif fn == "UniformField"
+                field = UniformField{Float64}(cmd["args"][1])
+                namespace[cmd["id"]] = field
             else
                 error("unrecognized function $fn")
                 return
             end
-        #elseif cmd["cmd"] == "delete"
-        #    delete!(namespace, cmd["id"])
+        elseif cmd["cmd"] == "delete"
+            for id in cmd["ids"]
+                delete!(namespace, id)
+            end
         else
             error("unrecognized command type")
             return
