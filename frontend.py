@@ -316,7 +316,7 @@ def Rotate(obj, ang):
 
 def Subtract(a, b):
     assert(type(a) == Solid and type(b) == Solid)
-    return Intersect2(a, Invert(b))
+    return Invert(Union2(Invert(a), b))
 
 def Intersect2(a, b):
     return Invert(Union2(Invert(a), Invert(b)))
