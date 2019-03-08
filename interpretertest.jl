@@ -22,5 +22,6 @@ function display_normals(normals::Array{T,3}, dists::Matrix{T}) where {T <: Abst
 end
 display_normals(canvas::Canvas) = display_normals(canvas.normals, canvas.grid)
 
-image = display_normals(result)
+update!(result.canvas)
+image = display_normals(result.canvas)
 display(image)

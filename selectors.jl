@@ -23,12 +23,13 @@ struct GridField{T} <: Field{T}
     data :: Matrix{T}
     offset :: Vector{T}
     spacing :: T
-    function GridField{T}(xlow::Real, ylow::Real, xhigh::Real, yhigh::Real, resolution::Real) where {T <: AbstractFloat}
+    oob :: T
+    function GridField{T}(xlow::Real, ylow::Real, xhigh::Real, yhigh::Real, resolution::Real, oob::Real) where {T <: AbstractFloat}
         dims = [yhigh - ylow, xhigh - xlow]
         gridSize = Int.(ceil.(resolution .* dims))
         yhigh, xhigh = [ylow, xlow] + (gridSize[2]-1)/resolution #correct positions
         grid = zeros(gridSize...)
-        new{T}(grid, [ylow, xlow], 1/resolution)
+        new{T}(grid, [ylow, xlow], 1/resolution, oob)
     end
 end
 function draw!(gridfield::GridField, f::Field)
@@ -39,4 +40,4 @@ function draw!(gridfield::GridField, f::Field)
     end
 end
 getindex(field::FromSolid{T}, posx::Real, posy::Real) where {T} = convert(T, field.solid[posx, posy] < 0)
-getindex(field::GridField{T}, posx::Real, posy::Real) where {T} = interpolate(field.data, (posy-field.offset[1])/field.spacing, (posx-field.offset[2])/field.spacing)
+getindex(field::GridField{T}, posx::Real, posy::Real) where {T} = interpolate(field.data, (posy-field.offset[1])/field.spacing, (posx-field.offset[2])/field.spacing, field.oob)

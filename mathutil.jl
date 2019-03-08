@@ -1,7 +1,7 @@
-function interpolate(mat::Matrix{T}, posy::T, posx::T) where {T}
+function interpolate(mat::Matrix{T}, posy::T, posx::T, default::T=typemax(T)) where {T}
     h, w = size(mat)
     if posx >= w-1 || posx < 0 || posy >= h-1 || posy < 0
-        return typemax(T)
+        return default
     else
         x0 = Int(floor(posx))+1
         y0 = Int(floor(posy))+1

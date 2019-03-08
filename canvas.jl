@@ -97,7 +97,10 @@ end
 
 struct FromCanvas{T} <: CSG{T}
     canvas :: Canvas{T}
+    oob_value :: T
 end
+FromCanvas{T}(can::Canvas{T}, inverted::Bool) where {T} = FromCanvas{T}(can, inverted ? typemin(T) : typemax(T))
+
 function getindex(csg::FromCanvas{T}, posx::Real, posy::Real) where {T}
-    return interpolate(csg.canvas.grid, (posy-csg.canvas.offset[1])/csg.canvas.spacing, (posx-csg.canvas.offset[2])/csg.canvas.spacing)
+    return interpolate(csg.canvas.grid, (posy-csg.canvas.offset[1])/csg.canvas.spacing, (posx-csg.canvas.offset[2])/csg.canvas.spacing, csg.oob_value)
 end

@@ -9,9 +9,9 @@ include("canvas.jl")
 #optional: basic error checking
 
 
-namespace = Dict()
+namespace = IdDict{String, Any}()
 
-function discretize(shape::CSG, resolution, xlow, ylow, xhigh, yhigh, repair=false)
+function discretize(shape::CSG, resolution, xlow, ylow, xhigh, yhigh, oob, repair=false)
     canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, resolution, Inf)
     println("allocated canvas with resolution $resolution and dims $(canvas.dims)")
     draw!(canvas, shape)
@@ -20,89 +20,83 @@ function discretize(shape::CSG, resolution, xlow, ylow, xhigh, yhigh, repair=fal
         update!(canvas)
         println("corrected SDF")
     end
-    return canvas
+    return FromCanvas{Float64}(canvas, oob) #oob: solid outside bounds
 end
 
-function discretize(field::Field, resolution, xlow, ylow, xhigh, yhigh)
-    field = GridField{Float64}(xlow, ylow, xhigh, yhigh, resolution)
-    draw!(field, shape)
+function discretize(field::Field, resolution, xlow, ylow, xhigh, yhigh, oob, repair=false)
+    canvas = GridField{Float64}(xlow, ylow, xhigh, yhigh, resolution, oob)
+    draw!(canvas, field)
     return field
 end
 
 function execute(cmds)
     for cmd in cmds
-        println(cmd)
+        println("$cmd\n")
         if cmd["cmd"] == "create"
-            if cmd["fn"] == "Transform"
+            fn = cmd["fn"]
+            if fn == "Transform"
                 inputShape = namespace[cmd["args"][1]]
-                if isa(inputShape, CSG)
-                    trans = cmd["args"][2]
-                    mat = trans[:matrix]
-                    offset = trans[:translation]
-                    matrix = [mat[:xx] mat[:xy]; mat[:yx] mat[:yy]]
-                    namespace[cmd["id"]] = Transform{Float64}(inputShape, offset[:x], offset[:y], matrix)
-                else
-                    error("Transform not implemented for $(typeof(inputShape))")
-                end
-            elseif cmd["fn"] == "Circle"
+                trans = cmd["args"][2]
+                mat = trans[:matrix]
+                offset = trans[:translation]
+                matrix = [mat[:xx] mat[:xy]; mat[:yx] mat[:yy]]
+                namespace[cmd["id"]] = Transform{Float64}(inputShape, offset[:x], offset[:y], matrix)
+            elseif fn == "Circle"
                 namespace[cmd["id"]] = Circle{Float64}(1.0)
-            elseif cmd["fn"] == "Square"
+            elseif fn == "Square"
                 namespace[cmd["id"]] = Square{Float64}(1.0)
-            elseif cmd["fn"] == "Union2"
+            elseif fn == "Union2"
                 left = namespace[cmd["args"][1]]
                 right = namespace[cmd["args"][2]]
-                namespace[cmd["id"]] = Union2{Float64, typeof(left), typeof(right)}(left, right)
-            elseif cmd["fn"] == "Invert"
+                namespace[cmd["id"]] = Union2(left, right)
+            elseif fn == "Invert"
                 shape = namespace[cmd["args"][1]]
-                namespace[cmd["id"]] = Negate{Float64, typeof(shape)}(shape)
-            elseif cmd["fn"] == "Discretize"
-                shape = namespace[cmd["args"][1]]
-                discretized = discretize(shape, cmd["resolution"], cmd["bbox"]...)
-                namespace[cmd["id"]] = FromCanvas{Float64}(discretized)
-            elseif cmd["fn"] == "DiscretizeAndRepairSDF"
-                shape = namespace[cmd["args"][1]]
-                discretized = discretize(shape, cmd["resolution"], cmd["bbox"]..., true)
-                namespace[cmd["id"]] = FromCanvas{Float64}(discretized)
-            elseif cmd["fn"] == "SolidToField"
+                namespace[cmd["id"]] = Negate(shape)
+            elseif fn == "SolidToField"
                 solid = namespace[cmd["args"][1]]
                 if isa(solid, CSG)
-                    field = FromSolid{Float64, typeof(solid)}(solid)
+                    field = FromSolid(solid)
                     namespace[cmd["id"]] = field
                 else
                     error("SolidToField called on non-field")
                 end
-            elseif cmd["fn"] == "BlurField"
+            elseif fn == "BlurField"
                 #noop
                 namespace[cmd["id"]] = namespace[cmd["args"][1]]
-            elseif cmd["fn"] == "ExpandSurface"
+            elseif fn == "ExpandSurface"
                 solid = namespace[cmd["args"][1]]
                 field = namespace[cmd["args"][2]]
                 fac = cmd["args"][3]
-                displaced = Displace{Float64, typeof(solid), typeof(field)}(solid, field, fac)
+                displaced = Displace(solid, field, fac)
                 namespace[cmd["id"]] = displaced
-            elseif cmd["fn"] == "UniformSolid"
+            elseif fn == "UniformSolid"
                 solid = UniformSolid{Float64}(cmd["args"][1])
                 namespace[cmd["id"]] = solid
             else
-                error("unrecognized function $(cmd["fn"])")
-                exit()
+                error("unrecognized function $fn")
+                return
             end
-        elseif cmd["cmd"] == "delete"
-            delete!(namespace, cmd["id"])
-        elseif cmd["cmd"] == "output"
-            result = namespace[cmd["id"]]
-            if isa(result, FromCanvas)
-                return result.canvas
-            elseif isa(result, CSG)
-                return discretize(result, cmd["resolution"], cmd["bbox"]..., true)
-            else
-                error("output not a solid")
-            end
+        #elseif cmd["cmd"] == "delete"
+        #    delete!(namespace, cmd["id"])
         else
             error("unrecognized command type")
-            exit()
+            return
         end
-        println()
 
+        if haskey(cmd, "discretize")
+            properties = cmd["discretize"]
+            if haskey(cmd, "oob_solid")
+                oob = cmd["oob_solid"]
+            elseif haskey(cmd, "oob_value")
+                oob = cmd["oob_value"]
+            end
+            shape = namespace[cmd["id"]]
+            discretized = discretize(shape, properties["resolution"], properties["bbox"]..., oob, properties["repair_sdf"])
+            namespace[cmd["id"]] = discretized
+        end
+
+        if haskey(cmd, "final")
+            return namespace[cmd["id"]]
+        end
     end
 end
