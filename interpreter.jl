@@ -8,19 +8,20 @@ include("canvas.jl")
 
 #optional: basic error checking
 
-
+maxdist = 9999
 namespace = IdDict{String, Any}()
+discarded = IdDict{String, Any}()
 
 function discretize(shape::CSG, resolution, xlow, ylow, xhigh, yhigh, oob, repair=false)
-    canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, resolution, Inf)
-    println("allocated canvas with resolution $resolution and dims $(canvas.dims)")
+    canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, resolution, maxdist)
+    println("allocated canvas with resolution $resolution and bbox [$xlow $ylow $xhigh $yhigh] and out value $oob")
     draw!(canvas, shape)
     println("populated canvas")
     if repair
         update!(canvas)
         println("corrected SDF")
     end
-    return FromCanvas{Float64}(canvas, oob) #oob: solid outside bounds
+    return FromCanvas{Float64}(canvas, oob ? -maxdist : maxdist) #oob: solid outside bounds
 end
 
 function discretize(field::Field, resolution, xlow, ylow, xhigh, yhigh, oob, repair=false)
@@ -81,9 +82,9 @@ function execute(cmds)
                 return
             end
         elseif cmd["cmd"] == "delete"
-            for id in cmd["ids"]
-                delete!(namespace, id)
-            end
+            # for id in cmd["ids"]
+            #     delete!(namespace, id)
+            # end
         else
             error("unrecognized command type")
             return
@@ -98,6 +99,7 @@ function execute(cmds)
             end
             shape = namespace[cmd["id"]]
             discretized = discretize(shape, properties["resolution"], properties["bbox"]..., oob, properties["repair_sdf"])
+            discarded[cmd["id"]] = shape
             namespace[cmd["id"]] = discretized
         end
 
