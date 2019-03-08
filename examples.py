@@ -6,7 +6,9 @@ def getCmds1():
 	for n in range(5):
 		scale = 1.0/(n+1)
 		shape = Union(shape, Translate(Scale(Circle(), Vec2(scale,scale)), Vec2(0, n)))
-
+	#shape2 = Scale(Square(), Vec2(0.2, 5))
+	#field = SolidToField(shape2)
+	#shape=ExpandSurface(shape, field, 0.2)
 
 	return Output(shape)
 
