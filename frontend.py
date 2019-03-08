@@ -244,11 +244,6 @@ def DoOperation(name, args):
     raise Exception("Invalid arguments: ", name, type(args), args)
 
 
-#class OperationData:
-    #__init__(self, func,)
-
-#  **a.__dict__
-
 def check_wrap(val, check=True):
     if callable(val):
         return val
@@ -309,7 +304,6 @@ def AddOperation(name, returntype, argtypes, bounds,
 
     OperationRegistry[name].append( ((lambda args: GetObject(returntype, name, args, construction_funcs)), argtypes) )
 
-#AddOperation("Discretize", (ObjType, True), [(ObjType, False)])
 
 def Translate(obj, vec):
     return Transform(obj, Transformation(Mat2x2(1,0,0,1),vec))
@@ -365,9 +359,9 @@ AddOperation("UniformSolid", Solid, [bool],
     solid_outside_bounds=lambda a: a[0])
 
 AddOperation("Union2", Solid, [Solid, Solid],
-    bounds=lambda a: ( ( a[0].bounds.intersect(a[1].bounds) ) if a[1].solid_outside_bounds else ( a[1].bounds ) ) if a[0].solid_outside_bounds else ( ( a[0].bounds ) if a[1].solid_outside_bounds else ( a[0].bounds.merge(a[1].bounds) ) ),
+    bounds=lambda a: ( ( a[0].bounds.intersect(a[1].bounds) ) if a[1].solid_outside_bounds else ( a[0].bounds ) ) if a[0].solid_outside_bounds else ( ( a[1].bounds ) if a[1].solid_outside_bounds else ( a[0].bounds.merge(a[1].bounds) ) ),
     requires_valid_sdf=False,
-    outputs_valid_sdf=IF_INPUTS_VALID,
+    outputs_valid_sdf=False,
     solid_outside_bounds=lambda a: a[0].solid_outside_bounds or a[1].solid_outside_bounds )
 
 AddOperation("Invert", Solid, [Solid],
