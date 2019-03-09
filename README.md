@@ -2,7 +2,7 @@
 
 # Milestone IV
 
-To run the fancy tree example, follow the same instructions as in milestone III. This should generate the below picture. The frontend python code used to generate the image is in examples.py (each getCmds() function is a separate example) and the code is compiled and run using interpretertest.jl in Julia. 
+To run the fancy tree example, follow the same instructions as in milestone III. This should generate the below picture. The frontend python code used to generate the image is in examples.py (each getCmds() function is a separate example) and the code is compiled and run using interpretertest.jl in Julia.
 
 ![tree](tree.PNG)
 
@@ -34,6 +34,7 @@ notebook()
 ```
 in the Julia REPL. Then you can run `include("canvas.jl")` in a new notebook, or see the existing notebook in this directory.
 Here is an example of the output of the sculpting prototype system:
+
 ![Abstract mushroom](step5.jpg)
 
 ## DSL code
