@@ -541,7 +541,7 @@ def Output(final, resolution=100):
         n.parent_samples_needed = n.parent_samples_needed_fn(n)
 
     for n,dl in creation_order(graph_top):
-        if sum(o.parent_samples_needed[o.input_nodes.index(n)] for o in n.output_nodes) > 1:
+        if len(n.input_nodes) > 0 and sum(o.parent_samples_needed[o.input_nodes.index(n)] for o in n.output_nodes) > 1:
             n.discretize = True
 
     final.discretize=True
