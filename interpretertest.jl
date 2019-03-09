@@ -1,14 +1,12 @@
 using PyCall
 sys = pyimport("sys")
 path = sys[:path]
-println(typeof(path))
 pathvec = PyVector(path)
 pushfirst!(pathvec, "")
-println(pathvec)
-println(path)
 sys[:path] = pathvec
 ex = pyimport("examples")
-cmds = ex[:getCmds3]()
+
+cmds = ex[:getCmds2]()
 include("interpreter.jl")
 result = execute(cmds)
 
