@@ -8,7 +8,7 @@ println(pathvec)
 println(path)
 sys[:path] = pathvec
 ex = pyimport("examples")
-cmds = ex[:getCmds3]()
+cmds = ex[:getCmds4]()
 include("interpreter.jl")
 result = execute(cmds)
 
