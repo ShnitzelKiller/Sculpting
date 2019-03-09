@@ -35,3 +35,9 @@ def getCmds3():
 	shape2 = Translate(Circle(), Vec2(0.2, 0))
 	shape3 = Subtract(shape, shape2)
 	return Output(shape3)
+
+def getCmds4():
+	vee = Translate(Scale(Square(), Vec2(0.4, 1)), Vec2(0, 1))
+	left = Rotate(vee, 30)
+	right = Rotate(vee, -30)
+	return Output(left)

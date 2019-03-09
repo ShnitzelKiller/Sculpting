@@ -10,7 +10,7 @@ include("canvas.jl")
 
 maxdist = 9999
 namespace = IdDict{String, Any}()
-discarded = IdDict{String, Any}()
+#discarded = IdDict{String, Any}()
 
 function discretize(shape::CSG, resolution, xlow, ylow, xhigh, yhigh, oob, repair=false)
     canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, resolution, maxdist)
@@ -82,9 +82,9 @@ function execute(cmds)
                 return
             end
         elseif cmd["cmd"] == "delete"
-            # for id in cmd["ids"]
-            #     delete!(namespace, id)
-            # end
+            for id in cmd["ids"]
+                delete!(namespace, id)
+            end
         else
             error("unrecognized command type")
             return
@@ -99,7 +99,7 @@ function execute(cmds)
             end
             shape = namespace[cmd["id"]]
             discretized = discretize(shape, properties["resolution"], properties["bbox"]..., oob, properties["repair_sdf"])
-            discarded[cmd["id"]] = shape
+            #discarded[cmd["id"]] = shape
             namespace[cmd["id"]] = discretized
         end
 
