@@ -1,5 +1,8 @@
 # 2D Sculpting
 
+# Milestone IV
+
+To run the fancy tree example, follow the same instructions as in milestone III.
 
 # Milestone III: Partial interpreter implementation
 The interpreter in `interpreter.jl` can be run on the test described in the document by running `julia interpretertest.jl`.
