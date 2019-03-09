@@ -38,18 +38,22 @@ function fast_marching!(states::Matrix{UInt8}, grid::Matrix{T}, h::T, maxdist::T
     Ifirst, Ilast = first(R), last(R)
     Iv = CartesianIndex(1, 0)
     Ih = CartesianIndex(0, 1)
+
     for I in R
-        if states[I] == 0 &&
-            (states[max(Ifirst, I-Iv)] >= 2 ||
+        if states[I] == 0
+            if (states[max(Ifirst, I-Iv)] >= 2 ||
              states[max(Ifirst, I-Ih)] >= 2 ||
              states[min(Ilast, I+Ih)] >= 2 ||
              states[min(Ilast, I+Iv)] >= 2)
-            states[I] = 1
-            dist = compute_distance(grid, I, Ifirst, Ilast, h, maxdist)
-            grid[I] = dist
-            enqueue!(L, I, dist)
+                states[I] = 1
+                dist = compute_distance(grid, I, Ifirst, Ilast, h, maxdist)
+                grid[I] = dist
+
+                enqueue!(L, I, dist)
+            end
         end
     end
+    
     #main loop
     while !isempty(L)
         I = dequeue!(L)
@@ -87,10 +91,10 @@ function fast_marching!(grid::Matrix{T}, h::Real, maxdist::Real=1) where {T <: A
     fast_marching!(states, grid, h, maxdist)
     for i in eachindex(grid)
         if states[i] == 3
-            states[i] == 0
+            states[i] = 0
             grid[i] = maxdist
         else
-            states[i] == 3
+            states[i] = 3
             grid[i] = -grid[i]
         end
     end
@@ -98,4 +102,5 @@ function fast_marching!(grid::Matrix{T}, h::Real, maxdist::Real=1) where {T <: A
     for i in eachindex(grid)
         grid[i] = -grid[i]
     end
+    return states #TODO: remove
 end

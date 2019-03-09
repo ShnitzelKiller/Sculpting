@@ -19,7 +19,7 @@ struct Canvas{T <: AbstractFloat}
         new{T}(1/resolution, [yhigh-ylow, xhigh-xlow], [ylow, xlow], maxdist, grid, normals)
     end
 end
-Canvas(height::Real, width::Real, spacing::Real, maxdist::Real) = Canvas{Float64}(height, width, spacing, maxdist)
+Canvas(height::Real, width::Real, resolution::Real, maxdist::Real) = Canvas{Float64}(height, width, resolution, maxdist)
 
 function update_sdf!(canvas::Canvas)
     fast_marching!(canvas.grid, canvas.spacing, canvas.maxdist)
