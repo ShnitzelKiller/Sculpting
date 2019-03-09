@@ -2,7 +2,9 @@
 
 # Milestone IV
 
-To run the fancy tree example, follow the same instructions as in milestone III.
+To run the fancy tree example, follow the same instructions as in milestone III. This should generate the below picture. The frontend python code used to generate the image is in examples.py (each getCmds() function is a separate example) and the code is compiled and run using interpretertest.jl in Julia. 
+
+![tree](tree.PNG)
 
 # Milestone III: Partial interpreter implementation
 The interpreter in `interpreter.jl` can be run on the test described in the document by running `julia interpretertest.jl`.
