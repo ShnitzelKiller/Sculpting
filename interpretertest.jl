@@ -6,7 +6,7 @@ pushfirst!(pathvec, "")
 sys[:path] = pathvec
 ex = pyimport("examples")
 
-cmds = ex[:getCmds2]()
+cmds = ex[:getCmds4]()
 include("interpreter.jl")
 result = execute(cmds)
 

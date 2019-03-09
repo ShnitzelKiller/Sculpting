@@ -37,7 +37,20 @@ def getCmds3():
 	return Output(shape3)
 
 def getCmds4():
-	vee = Translate(Scale(Square(), Vec2(0.4, 1)), Vec2(0, 1))
-	left = Rotate(vee, 30)
-	right = Rotate(vee, -30)
-	return Output(left)
+	thickness = 0.4
+	vee = Translate(Scale(Square(), Vec2(thickness, 1)), Vec2(0, -1))
+	#vee = Union(vee, Translate(Scale(Circle(), Vec2(thickness, thickness)), Vec2(0, 2)))
+	def replicate(branch):
+		piece = Union(vee, Translate(branch, Vec2(0, -2)))
+		left = Rotate(piece, 30)
+		right = Rotate(piece, -30)
+		return Union(left, right, Scale(Circle(), Vec2(thickness, thickness)))
+
+	tree = replicate(Scale(Circle(), Vec2(0.75, 0.75)))
+	fac = 0.75
+	f = UniformField(1)
+	for i in range(4):
+		tree = replicate(Scale(tree, Vec2(1, fac)))
+		tree = ExpandSurface(tree, f, -0.05)
+
+	return Output(tree)
