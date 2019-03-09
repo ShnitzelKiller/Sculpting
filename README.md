@@ -13,7 +13,8 @@ This assumes you have Julia installed, with the packages DataStructures, Plots, 
 using Pkg
 Pkg.add(“PackageName”)
 ```
-Then the above script should produce the same image as in the example in the document (albeit rotated since it fit better in the document that way).
+Then the above script should produce the same image as in the example in the document.
+Note that runtimes appear to be long, but the vast majority of the time is spent loading packages. Julia is not meant to be reloaded for individual small tasks. However, the backend algorithms themselves are orders of magnitude faster than their python counterparts.
 
 
 ## Sculpting prototype
