@@ -321,6 +321,9 @@ def Subtract(a, b):
 def Intersect2(a, b):
     return Invert(Union2(Invert(a), Invert(b)))
 
+def SoftIntersect(a, b, softness):
+    return Invert(SoftUnion(Invert(a), Invert(b), softness))
+
 #makes functions that can use arbitrary number of args
 for expand2 in ("Union","Intersect","Add","Multiply","Max","Min"):
     def temp2(expand):
@@ -361,6 +364,12 @@ AddOperation("UniformSolid", Solid, [bool],
 AddOperation("Union2", Solid, [Solid, Solid],
     bounds=lambda a: ( ( a[0].bounds.intersect(a[1].bounds) ) if a[1].solid_outside_bounds else ( a[0].bounds ) ) if a[0].solid_outside_bounds else ( ( a[1].bounds ) if a[1].solid_outside_bounds else ( a[0].bounds.merge(a[1].bounds) ) ),
     requires_valid_sdf=False,
+    outputs_valid_sdf=False,
+    solid_outside_bounds=lambda a: a[0].solid_outside_bounds or a[1].solid_outside_bounds )
+
+AddOperation("SoftUnion", Solid, [Solid, Solid, float],
+    bounds=lambda a: ( ( a[0].bounds.intersect(a[1].bounds) ) if a[1].solid_outside_bounds else ( a[0].bounds ) ) if a[0].solid_outside_bounds else ( ( a[1].bounds ) if a[1].solid_outside_bounds else ( a[0].bounds.merge(a[1].bounds) ) ),
+    requires_valid_sdf=True,
     outputs_valid_sdf=False,
     solid_outside_bounds=lambda a: a[0].solid_outside_bounds or a[1].solid_outside_bounds )
 
