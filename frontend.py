@@ -450,14 +450,10 @@ def creation_order(graph_top):
             if inputs_visited[out]==len(out.input_nodes):
                 fringe.append(out)
 
-
-has_run_output = False
-
 #this should only be run one time because it edits the nodes
 def Output(final, resolution=100):
-    global has_run_output
-    assert not has_run_output
-    has_run_output = True
+    global created_objects
+    global create_order
 
     assert type(final)==Solid
     assert not final.solid_outside_bounds
@@ -581,6 +577,10 @@ def Output(final, resolution=100):
         if n==final:
             cmd["final"]=True
             #print("\n".join([repr(c) for c in command_list]))
+
+            created_objects = {}
+            create_order = []
+
             return command_list
 
         #TODO: define internal commands for mutable input/output; reuse buffers when possible
