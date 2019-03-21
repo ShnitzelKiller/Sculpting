@@ -5,7 +5,10 @@
 
 
 ## Running Examples
-To run a few examples (which will be saved as example*.png in this directory), run `julia interpretertest.jl`.
+To run a few examples (which will be saved as example*.png in this directory), run
+```
+julia interpretertest.jl
+```
 This runs the interpreter in `interpreter.jl` on a couple of the tests defined in `examples.py`.
 This processes the input AST in the script `frontend.py` to produce the intermediate representation, which is then interpreted by `interpreter.jl`.
 
