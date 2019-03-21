@@ -24,21 +24,24 @@ function display_normals(normals::Array{T,3}, dists::Matrix{T}) where {T <: Abst
 end
 display_normals(canvas::Canvas) = display_normals(canvas.normals, canvas.grid)
 
-cmds = ex[:getCmds2]()
-
+cmds = ex[:getCmds6]()
 result = @time execute(cmds)
 println("finished processing")
-
 update!(result.canvas)
 image = display_normals(result.canvas)
 save("example1.png", image)
 
-
-cmds = ex[:getCmds4]()
-
+cmds = ex[:getCmds2]()
 result = @time execute(cmds)
 println("finished processing")
-
 update!(result.canvas)
 image = display_normals(result.canvas)
 save("example2.png", image)
+
+
+cmds = ex[:getCmds4]()
+result = @time execute(cmds)
+println("finished processing")
+update!(result.canvas)
+image = display_normals(result.canvas)
+save("example3.png", image)

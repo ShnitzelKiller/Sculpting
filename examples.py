@@ -65,3 +65,10 @@ def getCmds5(): #tree for testing performance difference (no surface ops)
 		tree = replicate(Scale(tree, Vec2(fac, fac)), thickness, vee)
 
 	return Output(tree)
+
+def getCmds6():
+	shape = Circle()
+	shape2 = Translate(Circle(), Vec2(1, 0))
+	field = SolidToField(shape2, 0.5)
+	finalshape = ExpandSurface(shape, field, -0.5)
+	return Output(finalshape)

@@ -56,8 +56,9 @@ function execute(cmds)
                 namespace[cmd["id"]] = Negate(shape)
             elseif fn == "SolidToField"
                 solid = namespace[cmd["args"][1]]
+                smoothness = cmd["args"][2]
                 if isa(solid, CSG)
-                    field = FromSolid(solid)
+                    field = FromSolid(solid, smoothness)
                     namespace[cmd["id"]] = field
                 else
                     error("SolidToField called on non-field")

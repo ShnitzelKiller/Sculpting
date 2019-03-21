@@ -290,7 +290,7 @@ def AddOperation(name, returntype, argtypes, bounds,
         assert solid_outside_bounds is None, "Unused for Field output"
         value_range = check_wrap(value_range, type(value_range)==tuple and len(value_range)==2 and type(value_range[0]) in (float,int) and type(value_range[1]) in (float,int))
         value_outside_bounds = check_wrap(value_outside_bounds, type(value_outside_bounds) in (float,int))
-      
+
     if name not in OperationRegistry:
         OperationRegistry[name] = []
         globals()[name] = lambda *args: DoOperation(name, args)
@@ -379,7 +379,7 @@ AddOperation("Invert", Solid, [Solid],
     outputs_valid_sdf=IF_INPUTS_VALID,
     solid_outside_bounds=lambda a: not a[0].solid_outside_bounds )
 
-AddOperation("ExpandSurface", Solid, [Solid, Field, float], 
+AddOperation("ExpandSurface", Solid, [Solid, Field, float],
     bounds=lambda a: a[0].bounds.expanded(max(a[2]*a[1].value_range[0], a[2]*a[1].value_range[1])),
     requires_valid_sdf=True,
     outputs_valid_sdf=False,
@@ -390,9 +390,9 @@ AddOperation("UniformField", Field, [float],
     value_range=lambda a: (a[0],a[0]),
     value_outside_bounds=lambda a: a[0])
 
-AddOperation("SolidToField", Field, [Solid],
+AddOperation("SolidToField", Field, [Solid, float],
     bounds=lambda a: a[0].bounds,
-    requires_valid_sdf=False,
+    requires_valid_sdf=True,
     value_range=(0,1),
     value_outside_bounds=lambda a: 1 if a[0].solid_outside_bounds else 0)
 
@@ -419,7 +419,7 @@ def BlurField(field, std):
 
 # AddOperation("Invert", Field, [Field])
 
-AddOperation("OutputNode", Solid, [Solid], 
+AddOperation("OutputNode", Solid, [Solid],
     bounds=lambda a: a[0].bounds,
     requires_valid_sdf=True,
     outputs_valid_sdf=True,
@@ -586,9 +586,5 @@ def Output(final, resolution=100):
         #TODO: define internal commands for mutable input/output; reuse buffers when possible
         if len(delete)>0:
             command_list.append({"cmd":"delete","ids":delete})
-    
+
     assert False, "didn't find end of list!"
-
-
-
-
