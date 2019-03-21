@@ -14,12 +14,12 @@ namespace = IdDict{String, Any}()
 
 function discretize(shape::CSG, resolution, xlow, ylow, xhigh, yhigh, oob, repair=false)
     canvas = Canvas{Float64}(xlow, ylow, xhigh, yhigh, resolution, maxdist)
-    println("allocated canvas with resolution $resolution and bbox [$xlow $ylow $xhigh $yhigh] and out value $oob")
+    #println("allocated canvas with resolution $resolution and bbox [$xlow $ylow $xhigh $yhigh] and out value $oob")
     draw!(canvas, shape)
-    println("populated canvas")
+    #println("populated canvas")
     if repair
         update!(canvas)
-        println("corrected SDF")
+        #println("corrected SDF")
     end
     return FromCanvas{Float64}(canvas, oob ? -maxdist : maxdist) #oob: solid outside bounds
 end
@@ -32,7 +32,7 @@ end
 
 function execute(cmds)
     for cmd in cmds
-        println("$cmd\n")
+        #println("$cmd\n")
         if cmd["cmd"] == "create"
             fn = cmd["fn"]
             if fn == "Transform"
@@ -41,7 +41,7 @@ function execute(cmds)
                 mat = trans[:matrix]
                 offset = trans[:translation]
                 matrix = [mat[:xx] mat[:xy]; mat[:yx] mat[:yy]]
-                println(matrix)
+                #println(matrix)
                 namespace[cmd["id"]] = Transform{Float64}(inputShape, offset[:x], offset[:y], matrix)
             elseif fn == "Circle"
                 namespace[cmd["id"]] = Circle{Float64}(1.0)
@@ -90,7 +90,8 @@ function execute(cmds)
             return
         end
 
-        if haskey(cmd, "discretize")
+        if haskey(cmd, "discretize")# && haskey(cmd, "final")
+            #println("discretize final output")
             properties = cmd["discretize"]
             if haskey(cmd, "oob_solid")
                 oob = cmd["oob_solid"]

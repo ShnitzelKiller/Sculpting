@@ -5,10 +5,7 @@ pathvec = PyVector(path)
 pushfirst!(pathvec, "")
 sys[:path] = pathvec
 ex = pyimport("examples")
-
-cmds = ex[:getCmds4]()
 include("interpreter.jl")
-result = execute(cmds)
 
 using Images
 function display_normals!(image::Matrix{RGB{T}}, normals::Array{T,3}, dists::Matrix{T}) where {T <: AbstractFloat}
@@ -26,6 +23,21 @@ function display_normals(normals::Array{T,3}, dists::Matrix{T}) where {T <: Abst
     return display_normals!(image, normals, dists)
 end
 display_normals(canvas::Canvas) = display_normals(canvas.normals, canvas.grid)
+
+cmds = ex[:getCmds2]()
+
+result = @time execute(cmds)
+println("finished processing")
+
+update!(result.canvas)
+image = display_normals(result.canvas)
+display(image)
+
+
+cmds = ex[:getCmds5]()
+
+result = @time execute(cmds)
+println("finished processing")
 
 update!(result.canvas)
 image = display_normals(result.canvas)
