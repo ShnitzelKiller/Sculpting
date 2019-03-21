@@ -31,7 +31,7 @@ println("finished processing")
 
 update!(result.canvas)
 image = display_normals(result.canvas)
-display(image)
+save("example1.png", image)
 
 
 cmds = ex[:getCmds5]()
@@ -41,4 +41,4 @@ println("finished processing")
 
 update!(result.canvas)
 image = display_normals(result.canvas)
-display(image)
+save("example2.png", image)
