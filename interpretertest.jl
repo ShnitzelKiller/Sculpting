@@ -34,7 +34,7 @@ image = display_normals(result.canvas)
 save("example1.png", image)
 
 
-cmds = ex[:getCmds5]()
+cmds = ex[:getCmds4]()
 
 result = @time execute(cmds)
 println("finished processing")
