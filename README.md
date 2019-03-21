@@ -9,6 +9,9 @@ To run a few examples (which will be saved as example*.png in this directory), r
 ```
 julia interpretertest.jl
 ```
+
+The results, in order, are a simple example of displacement based on fuzzy selection, the berry example from the report, and a fractal tree.
+
 This runs the interpreter in `interpreter.jl` on a couple of the tests defined in `examples.py`.
 This processes the input AST in the script `frontend.py` to produce the intermediate representation, which is then interpreted by `interpreter.jl`.
 
